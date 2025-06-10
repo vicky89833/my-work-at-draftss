@@ -1,0 +1,3811 @@
+Draftss Work:
+June 2 Update:
+
+-got access to gitlab repos 
+ and worked on the setup of
+ AbunDRFBackend.
+- Got some error related to k8 while setting-up.
+  Kubernate's use is new for me
+  followed some basic tutorial.
+- abun React frontend is cloned and setupded .
+- some functionality in frontend is showing 
+  restrictions. like login and signup is showing
+  cross origin request blocked.
+
+login_page:
+*****************************************************************************************
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { storeAccessToken, storeRefreshToken } from "../../utils/jwt";
+import { pageURL } from "../routes";
+import './Login.min.css';
+
+import axios, { AxiosError } from 'axios';
+import { Icon } from 'react-icons-kit';
+import { eye } from 'react-icons-kit/feather/eye';
+import { eyeOff } from 'react-icons-kit/feather/eyeOff';
+import LocalIcon from "../../components/Icon/Icon";
+
+interface LoginResponse {
+	access_token: string
+	refresh_token: string
+}
+
+interface ErrorResponse {
+	err_id?: string;
+	message: string;
+}
+
+export default function Login() {
+	// ------------------------- QUERY PARAMETERS -----------------------
+	const [searchParams] = useSearchParams();
+	const appSumoCode = searchParams.get("code");
+
+	// ----------------------- STATES -----------------------
+	const [loginUnderway, setLoginUnderway] = useState(false);
+	const [googleLoginUnderWay, setGoogleLoginUnderWay] = useState(false);
+
+	// ----------------------- REACT REFS -----------------------
+	const emailElementRef = useRef<HTMLInputElement>(null);
+	const passwordElementRef = useRef<HTMLInputElement>(null);
+	const errorMessageTextRef = useRef<HTMLParagraphElement>(null);
+
+	const navigate = useNavigate();
+
+	useEffect(() => {
+		document.title = "Login | Abun"
+	}, []);
+
+	/* -------------- validation functions -------------- */
+	function emailIsValid(value: string): boolean {
+		return /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i.test(value);
+	}
+
+	function passwordIsValid(value: string): boolean {
+		return value.length >= 6
+	}
+
+	/* ------------------------------------------------- */
+
+	/**
+	 * Shows error message below the submit button
+	 * @param msg - error message to show
+	 */
+	function displayErrorMessage(msg: string) {
+		if (errorMessageTextRef.current) {
+			errorMessageTextRef.current.classList.remove('is-hidden');
+			errorMessageTextRef.current.innerText = msg;
+		}
+	}
+
+	/**
+	 * Hides error message below the submit button
+	 */
+	function removeErrorMessage() {
+		if (errorMessageTextRef.current) {
+			errorMessageTextRef.current.classList.add('is-hidden');
+			errorMessageTextRef.current.innerText = "";
+		}
+	}
+
+	function submitLoginData() {
+		// clear all error messages
+		removeErrorMessage();
+
+		const email: string = emailElementRef.current?.value || "";
+		const password: string = passwordElementRef.current?.value || "";
+
+		if (!emailIsValid(email) || !passwordIsValid(password)) {
+			displayErrorMessage("Please enter a valid email id and password");
+			return;
+		}
+
+		setLoginUnderway(true);
+
+		/* submit data to server */
+		axios({
+			method: "post",
+			url: process.env.REACT_APP_DRF_DOMAIN + "/api/frontend/login/",
+			responseType: 'json',
+			data: {
+				email: email,
+				password: password,
+				appsumo_code: appSumoCode
+			}
+		}).then(response => {
+			// Logged in successfully. Redirect to next page.
+			let result: LoginResponse = response.data;
+			let accessToken: string = result.access_token;
+			let refreshToken: string = result.refresh_token;
+
+			// check to prevent "undefined" string being stored as the value
+			if (accessToken && refreshToken) {
+				storeAccessToken(accessToken);
+				storeRefreshToken(refreshToken);
+				return navigate(pageURL['createArticle']);
+			} else {
+				setLoginUnderway(false);
+				displayErrorMessage("We are currently facing some issues. Please try again later.");
+			}
+
+		}).catch(err => {
+			setLoginUnderway(false);
+			const axiosError = err as AxiosError<ErrorResponse>;
+			if (axiosError.response?.status === 401) {
+				const errId = axiosError.response.data?.message || "Unknown error occurred.";
+				displayErrorMessage(errId);
+			} else {
+				console.error(err);
+				displayErrorMessage("We are currently facing some issues. Please try again later.");
+			}
+		});
+	}
+
+
+	const [password, setPassword] = useState("");
+	const [type, setType] = useState('password');
+	const [icon, setIcon] = useState(eyeOff);
+	const handleToggle = () => {
+		if (type === 'password') {
+			setIcon(eye);
+			setType('text')
+		} else {
+			setIcon(eyeOff)
+			setType('password')
+		}
+	}
+
+	return (
+		<div className="login-wrapper">
+			<div className="login-container">
+				<h1 className="heading-text epilogue has-text-black">Login</h1>
+				<h2 className="subtitle-text has-text-black bricolage">One Aim. More Organic Traffic to you, effortlessly.</h2>
+
+				<div className="card login-card mt-5">
+					<div className="card-content">
+						<div className="content has-text-centered"
+							onKeyDown={e => {
+								if (e.key === 'Enter') {
+									submitLoginData();
+								}
+							}}>
+							<p ref={errorMessageTextRef} className="has-text-danger is-small has-text-centered is-hidden error-msg mb-0"></p>
+							{/* ------------------ EMAIL ID ------------------ */}
+							<div className="field mt-2">
+								<div className="control">
+									<input ref={emailElementRef}
+										className="input is-medium"
+										type="email"
+										name="password"
+										placeholder="Email ID" />
+								</div>
+							</div>
+							{/* ------------------ PASSWORD ------------------ */}
+							<div className="field mt-5">
+								<div className="control">
+									<input ref={passwordElementRef}
+										className="input is-medium"
+										type={type}
+										name="password"
+										placeholder="Password"
+										value={password}
+										onChange={(e) => setPassword(e.target.value)}
+										autoComplete="current-password" />
+									<span className="eye-icon" onClick={handleToggle}>
+										<Icon icon={icon} size={25} />
+									</span>
+								</div>
+							</div>
+							
+							{loginUnderway ? 
+                                <button className="button logging-In-btn is-large is-responsive mt-5"
+                                style={{ borderRadius: "8px" }}>
+                                    <span>Logging In...&nbsp;&nbsp;<LocalIcon iconName={"spinner"} additionalClasses={["icon-white"]} /></span>
+                                </button>
+							:
+                            <button  className="button login-btn-border is-large is-responsive mt-5"
+                            style={{ borderRadius: "8px" }}
+                            disabled={loginUnderway || googleLoginUnderWay}
+                            onClick={submitLoginData}>
+                                <span>LOGIN →</span> 
+                            </button>
+							}
+
+							<div className="divider-wrapper mt-4 mb-4">
+								<span style={{marginLeft: '10px', marginRight: '10px', fontFamily: 'Bricolage Grotesque, normal'}}>OR</span>
+							</div>
+							<div className='connect-account'>
+								<button
+									disabled={loginUnderway || googleLoginUnderWay}
+									onClick={() => {
+										setGoogleLoginUnderWay(true);
+
+										axios({
+											method: "get",
+											url: process.env.REACT_APP_DRF_DOMAIN + "/api/fontend/google-signup-login-auth/?signup=false",
+											responseType: 'json',
+										}).then((response) => {
+											if (response.status === 200) {
+												const auth_url = response.data.authorization_endpoint;
+												window.location.href = auth_url;
+											} else {
+												setGoogleLoginUnderWay(false);
+											}
+										})
+
+									}}
+									className='button login-btn-border'>
+									<LocalIcon iconName='google' />
+									{
+										googleLoginUnderWay ?
+											<span className='ml-3'>
+												Sign in with Google...&nbsp;&nbsp;<LocalIcon iconName={"spinner"} additionalClasses={["icon-white"]} />
+											</span> :
+											<span className='ml-3'>
+												Sign in with Google →
+											</span>
+									}
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<p className="has-text-white has-text-centered is-size-4 mt-6 bricolage">
+					<div className="user-login">
+						<Link to={appSumoCode ? `${pageURL['appSumoSignUp']}?code=${appSumoCode}` : pageURL['signup']} className="has-text-black is-underlined">Create New Account</Link>
+						<span className="has-text-black"><span className="divider">|</span></span>
+						<Link to={pageURL['forgotPassword']} className="has-text-black is-underlined">Forgot Password?</Link>
+					</div>
+				</p>
+			</div>
+		</div>
+	)
+}
+
+explaination login_page:
+*********************************************************************************
+This React login page component implements a comprehensive authentication system with both email/password and Google OAuth login options. Here's a breakdown of its key functionality:
+
+## Core Structure and State Management
+
+The component uses several React hooks to manage different aspects of the login process:
+
+- **Form validation states**: Tracks whether login is in progress (`loginUnderway`) and Google login status (`googleLoginUnderWay`)
+- **Password visibility toggle**: Uses state to switch between showing/hiding the password field
+- **URL parameters**: Extracts AppSumo promotional codes from the URL using `useSearchParams`
+
+## Form Validation
+
+The component includes two validation functions:
+- `emailIsValid()`: Uses regex pattern matching to verify email format
+- `passwordIsValid()`: Ensures passwords are at least 6 characters long
+
+## Error Handling System
+
+The error messaging system uses DOM refs to directly manipulate error display elements:
+- `displayErrorMessage()`: Shows error messages below the submit button
+- `removeErrorMessage()`: Hides error messages and clears text content
+
+## Authentication Flow
+
+### Email/Password Login
+The `submitLoginData()` function handles the primary login process:
+1. Validates email and password inputs
+2. Makes an API call to the backend login endpoint
+3. On success, stores JWT tokens using utility functions and redirects to the article creation page
+4. On failure, displays appropriate error messages based on HTTP status codes
+
+### Google OAuth Integration
+The Google login feature:
+1. Makes a request to get the Google authorization URL from the backend
+2. Redirects users to Google's OAuth flow
+3. Shows loading states during the process
+
+## User Experience Features
+
+**Password Visibility Toggle**: Users can click an eye icon to show/hide their password, implemented with React Icons Kit.
+
+**Loading States**: Both login buttons show loading indicators and disable interaction during authentication requests.
+
+**Keyboard Navigation**: The form supports Enter key submission for better accessibility.
+
+**Promotional Code Support**: Integrates AppSumo promotional codes that get passed to the backend during authentication.
+
+## Navigation and Routing
+
+The component uses React Router for:
+- Navigation after successful login
+- Links to sign-up and password reset pages
+- Conditional AppSumo sign-up routing based on promotional codes
+
+## Styling and UI
+
+The component uses Bulma CSS framework classes for styling, creating a card-based layout with responsive design. It includes custom CSS classes for specific styling needs like button states and dividers.
+
+This implementation provides a robust, user-friendly login experience with proper error handling, multiple authentication methods, and good accessibility practices.
+
+
+
+
+June 5:
+new_article_data_api:
+**********************************************************************************
+1.request validation
+2.Keyword generation
+3.project 
+
+#Generate article uid logic
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def new_article_data_api(request: Request):
+
+    user: User = request.user
+    keyword_string: str = request.data.get('keyword')
+    title: str = request.data.get('title')
+    serp_titles: List = request.data.get('serp_titles')
+    creative_titles: List = request.data.get('creative_titles')
+    article_context: str = request.data.get('article_context')
+
+    # convert article context to english if it is not in english
+    if article_context:
+        article_context = GoogleTranslator(source='auto', target='en').translate(article_context)
+
+    # Check if the required fields are provided
+    if not keyword_string or not title:
+        return JsonResponse({'success': False, 'error': 'Keyword and title are required.'}, status=400)
+
+    if len(keyword_string) > 300:
+        return JsonResponse({'success': False, 'error': 'Keyword is too long.'}, status=400)
+
+    # Normalize the keyword input
+    keyword_string = unescape_amp_char(keyword_string.strip().lower())
+
+    authenticated_user: User = request.user
+
+    # Check if the user is verified
+    if not authenticated_user.verified and not authenticated_user.has_ltd_plans:
+        return JsonResponse({'success': False, 'error': 'User is not verified.'}, status=403)
+
+     # Prepare keywords for batch processing
+    keyword_list = [keyword_string]
+
+    # Fetch keyword data in batches
+    try:
+        keyword_data_list = fetch_keyword_data(keyword_list)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+    
+    
+        # Process fetched keyword data
+    for keyword_data in keyword_data_list:
+        cleaned_keyword: str = re.sub(r'[^\w\s]', "", keyword_data['keyword'])
+        keyword_object = create_keyword_object(
+            user=authenticated_user,
+            keyword=cleaned_keyword,
+            with_default_values=False,  # Set to False since we have real data
+            source=keyword_data['source'],  # This will be 'keywordseverywhere' or 'dataforseo'
+            country=keyword_data['country'],  # This will be 'global'
+            serp_position=keyword_data['serp_position'],  # This will be None
+            volume=keyword_data['volume'],
+            cpc_currency="USD",
+            cpc_value=keyword_data['cpc'],
+            paid_difficulty=keyword_data['paid_difficulty'],
+            trend=keyword_data['trend'],
+        )
+        keyword_object.save()
+
+    user.total_keywords_generated += 1
+    user.save()
+    keyword_project_id = str(uuid.uuid4())
+
+    # Determine the project name based on the source of the title
+    all_titles=[]
+
+    if title in creative_titles:
+        all_titles=creative_titles
+        project_name = "Creative-KW-" + keyword_string[:6]
+
+    elif title in serp_titles:
+        all_titles=serp_titles
+        project_name = "Serp-KW-" + keyword_string[:6]
+
+    else:
+        project_name = "AI-KW-" + keyword_string[:6]  # Fallback case if title source is unknown
+
+
+    # Fetch the first KeywordProject for the user
+    keyword_project= KeywordProject.objects.create(
+        website=authenticated_user.current_active_website,
+        project_id=keyword_project_id,
+        project_name=project_name,
+        location_iso_code='zz',
+    )
+
+    #Link the keyword to the KeywordProject using the reverse relationship
+    keyword_project.keywords.add(keyword_object)
+
+    # Update total traffic volume in the KeywordProject
+    total_traffic_volume = sum(kw.volume for kw in keyword_project.keywords.all())
+    keyword_project.total_traffic_volume = total_traffic_volume
+    keyword_project.save()
+
+
+    if title in all_titles:
+        all_titles.remove(title)  # Remove the selected title from the list
+
+    # Generate article for the selected title
+    selected_article_uid = generate_article_uid(username=authenticated_user.username, article_type="default")
+
+    # Create the selected article
+    Article.objects.create(
+        website=authenticated_user.current_active_website,
+        article_uid=selected_article_uid,
+        title=unescape_amp_char(title),
+        keyword=keyword_object,
+        context=article_context
+    )
+
+    # Generate articles for the remaining titles (without the selected title)
+    article_bulk_ops = []
+    for keyword_title in all_titles:
+        article_uid = generate_article_uid(username=authenticated_user.username, article_type="default")
+        article_bulk_ops.append(Article(
+            website=authenticated_user.current_active_website,
+            article_uid=article_uid,
+            title=unescape_amp_char(keyword_title),
+            keyword=keyword_object,
+        ))
+
+    Article.objects.bulk_create(article_bulk_ops)
+
+    # Return the article_uid and keyword_project_id in the response
+    return JsonResponse({
+        'success': True,
+        'article_uid': selected_article_uid,
+        'message': 'ArticleUID created successfully.'
+    })
+
+explain new_article ...:
+*****************************************************
+# Django Article Generation API - Line by Line Explanation
+
+## Function Definition and Decorators
+
+```python
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def new_article_data_api(request: Request):
+```
+
+- `@api_view(['POST'])`: Django REST framework decorator that restricts this endpoint to only accept POST requests
+- `@permission_classes([IsAuthenticated])`: Ensures only authenticated users can access this endpoint
+- `@transaction.atomic`: Wraps the entire function in a database transaction - if any part fails, all database changes are rolled back
+- `def new_article_data_api(request: Request):`: Function definition with type hint for the request parameter
+
+## Extract Data from Request
+
+```python
+user: User = request.user
+keyword_string: str = request.data.get('keyword')
+title: str = request.data.get('title')
+serp_titles: List = request.data.get('serp_titles')
+creative_titles: List = request.data.get('creative_titles')
+article_context: str = request.data.get('article_context')
+```
+
+- `user: User = request.user`: Gets the authenticated user from the request
+- `keyword_string: str = request.data.get('keyword')`: Extracts the keyword from POST data
+- `title: str = request.data.get('title')`: Extracts the selected article title
+- `serp_titles: List = request.data.get('serp_titles')`: Gets list of SERP (Search Engine Results Page) titles
+- `creative_titles: List = request.data.get('creative_titles')`: Gets list of AI-generated creative titles
+- `article_context: str = request.data.get('article_context')`: Gets additional context for the article
+
+## Translation Logic
+
+```python
+if article_context:
+    article_context = GoogleTranslator(source='auto', target='en').translate(article_context)
+```
+
+- Checks if article context exists
+- Uses GoogleTranslator to automatically detect source language and translate to English
+- This ensures all article contexts are standardized in English
+
+## Input Validation
+
+```python
+if not keyword_string or not title:
+    return JsonResponse({'success': False, 'error': 'Keyword and title are required.'}, status=400)
+
+if len(keyword_string) > 300:
+    return JsonResponse({'success': False, 'error': 'Keyword is too long.'}, status=400)
+```
+
+- Validates that both keyword and title are provided, returns 400 Bad Request if missing
+- Checks keyword length doesn't exceed 300 characters, returns error if too long
+
+## Data Preprocessing
+
+```python
+keyword_string = unescape_amp_char(keyword_string.strip().lower())
+authenticated_user: User = request.user
+```
+
+- `unescape_amp_char()`: Custom function to handle HTML entity unescaping (likely converts `&amp;` to `&`)
+- `strip()`: Removes leading/trailing whitespace
+- `lower()`: Converts to lowercase for consistency
+- Re-assigns the authenticated user (redundant since already assigned above)
+
+## User Verification Check
+
+```python
+if not authenticated_user.verified and not authenticated_user.has_ltd_plans:
+    return JsonResponse({'success': False, 'error': 'User is not verified.'}, status=403)
+```
+
+- Checks if user is either verified OR has lifetime deal (LTD) plans
+- Returns 403 Forbidden if user doesn't meet verification requirements
+
+## Keyword Data Processing
+
+```python
+keyword_list = [keyword_string]
+
+try:
+    keyword_data_list = fetch_keyword_data(keyword_list)
+except Exception as e:
+    return JsonResponse({'success': False, 'error': str(e)}, status=500)
+```
+
+- Creates a list containing the single keyword (prepared for batch processing)
+- Calls `fetch_keyword_data()` function to get keyword metrics from external APIs
+- Catches any exceptions and returns 500 Internal Server Error
+
+## Keyword Object Creation
+
+```python
+for keyword_data in keyword_data_list:
+    cleaned_keyword: str = re.sub(r'[^\w\s]', "", keyword_data['keyword'])
+    keyword_object = create_keyword_object(
+        user=authenticated_user,
+        keyword=cleaned_keyword,
+        with_default_values=False,
+        source=keyword_data['source'],
+        country=keyword_data['country'],
+        serp_position=keyword_data['serp_position'],
+        volume=keyword_data['volume'],
+        cpc_currency="USD",
+        cpc_value=keyword_data['cpc'],
+        paid_difficulty=keyword_data['paid_difficulty'],
+        trend=keyword_data['trend'],
+    )
+    keyword_object.save()
+```
+
+- Loops through fetched keyword data (though typically just one keyword)
+- `re.sub(r'[^\w\s]', "", keyword_data['keyword'])`: Removes all non-alphanumeric characters except spaces
+- `create_keyword_object()`: Custom function that creates a Keyword model instance with:
+  - User association
+  - Cleaned keyword text
+  - Real data instead of defaults (`with_default_values=False`)
+  - Source API (KeywordsEverywhere or DataForSEO)
+  - Global country targeting
+  - Search volume, cost-per-click, difficulty metrics, and trend data
+- Saves the keyword object to database
+
+## User Statistics Update
+
+```python
+user.total_keywords_generated += 1
+user.save()
+keyword_project_id = str(uuid.uuid4())
+```
+
+- Increments the user's total keyword count
+- Saves user changes to database
+- Generates unique UUID for the keyword project
+
+## Project Name Logic
+
+```python
+all_titles=[]
+
+if title in creative_titles:
+    all_titles=creative_titles
+    project_name = "Creative-KW-" + keyword_string[:6]
+
+elif title in serp_titles:
+    all_titles=serp_titles
+    project_name = "Serp-KW-" + keyword_string[:6]
+
+else:
+    project_name = "AI-KW-" + keyword_string[:6]
+```
+
+- Initializes empty list for all titles
+- Determines project naming based on title source:
+  - If title comes from creative titles: prefix "Creative-KW-"
+  - If title comes from SERP titles: prefix "Serp-KW-"
+  - Otherwise: prefix "AI-KW-" (fallback)
+- Appends first 6 characters of keyword to project name
+
+## Keyword Project Creation
+
+```python
+keyword_project= KeywordProject.objects.create(
+    website=authenticated_user.current_active_website,
+    project_id=keyword_project_id,
+    project_name=project_name,
+    location_iso_code='zz',
+)
+
+keyword_project.keywords.add(keyword_object)
+
+total_traffic_volume = sum(kw.volume for kw in keyword_project.keywords.all())
+keyword_project.total_traffic_volume = total_traffic_volume
+keyword_project.save()
+```
+
+- Creates new KeywordProject with:
+  - Associated website
+  - Generated UUID
+  - Determined project name
+  - Global location code ('zz')
+- Links the keyword to the project using many-to-many relationship
+- Calculates total traffic volume by summing all keyword volumes in the project
+- Updates and saves the project
+
+## Article Creation Logic
+
+```python
+if title in all_titles:
+    all_titles.remove(title)
+
+selected_article_uid = generate_article_uid(username=authenticated_user.username, article_type="default")
+
+Article.objects.create(
+    website=authenticated_user.current_active_website,
+    article_uid=selected_article_uid,
+    title=unescape_amp_char(title),
+    keyword=keyword_object,
+    context=article_context
+)
+```
+
+- Removes the selected title from the list to avoid duplication
+- Generates unique article UID using custom function
+- Creates the main Article object with:
+  - User's active website
+  - Generated UID
+  - Cleaned title (unescaping HTML entities)
+  - Associated keyword
+  - Article context
+
+## Bulk Article Creation
+
+```python
+article_bulk_ops = []
+for keyword_title in all_titles:
+    article_uid = generate_article_uid(username=authenticated_user.username, article_type="default")
+    article_bulk_ops.append(Article(
+        website=authenticated_user.current_active_website,
+        article_uid=article_uid,
+        title=unescape_amp_char(keyword_title),
+        keyword=keyword_object,
+    ))
+
+Article.objects.bulk_create(article_bulk_ops)
+```
+
+- Initializes list for bulk operations
+- Loops through remaining titles (excluding the selected one)
+- For each title:
+  - Generates unique article UID
+  - Creates Article instance (without saving yet)
+  - Adds to bulk operations list
+- `bulk_create()`: Efficiently creates all articles in a single database query
+
+## Response
+
+```python
+return JsonResponse({
+    'success': True,
+    'article_uid': selected_article_uid,
+    'message': 'ArticleUID created successfully.'
+})
+```
+
+- Returns successful JSON response with:
+  - Success flag
+  - The selected article's UID for frontend reference
+  - Success message
+
+## Summary
+
+This API endpoint creates a comprehensive article generation system that:
+1. Validates input and user permissions
+2. Fetches keyword data from external APIs
+3. Creates keyword and project records
+4. Generates multiple articles from different title sources
+5. Uses efficient bulk operations for performance
+6. Maintains data consistency with database transactions
+
+
+
+usermaneger:
+************************************************************************
+class CustomUserManager(BaseUserManager):
+ def create_user(self, username: str,
+ email: str,
+ password: str,
+# team: Team,
+ extra_fields):
+ email = self.normalize_email(email)
+# self.model calls User class with provided arguments
+# user = self.model(username=username, email=email, team=team, extra_fields)
+ user = self.model(username=username, email=email, **extra_fields)
+ user.password = make_password(password)
+# user.current_active_team = team
+ user.save()
+return user
+
+eplain usermanager:
+This is a **Django custom user manager** that handles user creation. Let me break down each part:
+
+## Class Definition
+```python
+class CustomUserManager(BaseUserManager):
+```
+- Inherits from Django's `BaseUserManager`
+- Provides custom logic for creating users
+
+## Method Definition
+```python
+def create_user(self, username: str, email: str, password: str, **extra_fields):
+```
+- Defines a method to create regular users (not superusers)
+- Takes required fields: `username`, `email`, `password`
+- `**extra_fields` allows passing additional optional fields
+- Note: There's a commented out `team: Team` parameter
+
+## Email Normalization
+```python
+email = self.normalize_email(email)
+```
+- Uses Django's built-in method to standardize email format
+- Converts domain part to lowercase, handles edge cases
+
+## User Instance Creation
+```python
+user = self.model(username=username, email=email, **extra_fields)
+```
+- `self.model` refers to the User model this manager is attached to
+- Creates a new user instance with provided data
+- Commented line shows it previously included team assignment
+
+## Password Handling
+```python
+user.password = make_password(password)
+```
+- `make_password()` is Django's function to hash passwords securely
+- Never stores plain text passwords - always hashed
+
+## Save and Return
+```python
+user.save()
+return user
+```
+- Saves the user to the database
+- Returns the created user instance
+
+## Key Observations:
+1. **Team functionality was removed** - The commented lines suggest this system previously had team-based organization
+2. **Security focused** - Properly hashes passwords and normalizes emails
+3. **Flexible** - Uses `**extra_fields` to handle additional user fields
+4. **Standard Django pattern** - Follows Django's recommended approach for custom user managers
+
+This manager would typically be used in a custom User model to handle user creation with specific business logic.
+
+*********************************************************************************************
+class User(AbstractBaseUser):
+    """
+    Custom user model. Inherits AbstractBaseUser model.
+
+    password and last_login are inherited from base class
+    """
+    PROTOCOL_TYPES = [
+        ('http', 'http'),
+        ('https', 'https'),
+    ]
+
+    KEYWORD_STRATEGIES = [
+        ('volume', "Volume Based"),
+        ('cpc', "CPC Based"),
+        ('competition', "Competition Based"),
+    ]
+
+    objects = CustomUserManager()
+
+    admin = models.BooleanField(default=False)  # Use to mark account as Abun 'admin'
+
+    email = models.EmailField(max_length=254, unique=True, db_index=True)
+    verified = models.BooleanField(default=False)
+    username = models.CharField(max_length=150, blank=False, null=False)
+    user_timezone = models.CharField(max_length=100, default='UTC')
+    date_joined = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+    last_login = models.DateTimeField(default=timezone.now)
+    user_tz = models.CharField(max_length=300, default='UTC')
+    keywords_generated = models.IntegerField(default=0)
+    titles_generated = models.IntegerField(default=0)
+    blog_emails_found = models.IntegerField(default=0)
+    articles_generated = models.IntegerField(default=0)
+    glossary_topic_generated = models.IntegerField(default=0)
+    country = models.CharField(max_length=300, default="United States")
+    signup_using_google = models.BooleanField(default=False)
+    last_login_using_google = models.BooleanField(default=False)
+    password_setup_required = models.BooleanField(default=False)
+
+    # ------ for stripe payment ------
+    stripe_customer_id = models.CharField(max_length=300, null=True, blank=False, default=None)
+    stripe_subscription_id = models.CharField(max_length=300, blank=False, null=True, default=None)
+    stripe_product_id = models.CharField(max_length=300, blank=False, null=True, default=None)
+    stripe_pricing_id = models.CharField(max_length=300, blank=False, null=True, default=None)
+    payment_pending = models.BooleanField(default=False)
+    stripe_active_checkout_session_id = models.CharField(max_length=500, blank=False, null=True, default=None)
+
+    # ------ for reset password ------
+    reset_password_uid = models.CharField(max_length=64, null=True, blank=False, default=None)
+    reset_password_expiry = models.DateTimeField(null=True, default=None)
+
+    # ------ preferences/settings ------
+    send_notification_emails = models.BooleanField(default=True)
+
+    # ------ for email cronjobs ------
+    feedback_email_sent = models.BooleanField(default=False)
+    founders_email_sent = models.BooleanField(default=False)
+    article_email_sent = models.BooleanField(default=False)
+    no_plan_selection_email_sent = models.BooleanField(default=False)
+
+    # ------ for survey ------
+    survey_completed = models.BooleanField(default=False)
+
+    # ------ for appsumo license ------
+    appsumo_licenses = models.ManyToManyField("AppSumoLicense")
+
+    # ------ all time generated title & article stats ------
+    total_titles_generated = models.IntegerField(default=0)
+    total_articles_generated = models.IntegerField(default=0)
+    total_keywords_generated = models.IntegerField(default=0)
+
+    # ------ blog finder email stats ------
+    total_blog_emails_found = models.IntegerField(default=0)
+
+    # ------ glossary contents stats ------
+    glossary_contents_generated = models.IntegerField(default=0)
+    last_glossary_reset = models.DateTimeField(default=timezone.now)  # stores the last reset date
+
+    # ------ guest post finder stats ------
+    gpf_queries_generated = models.IntegerField(default=0)
+    last_gpf_queries_reset = models.DateTimeField(default=timezone.now)  # stores the last reset date
+
+    # ------ reddit post finder stats ------
+    rpf_queries_generated = models.IntegerField(default=0)
+    last_rpf_queries_reset = models.DateTimeField(default=timezone.now)  # stores the last reset date
+
+    # TODO: when the website referenced in current_active_website is deleted,
+    #        things will be handled by pre_save signal on Website model
+    current_active_website = models.ForeignKey('Website',
+                                               null=True,
+                                               on_delete=models.DO_NOTHING,
+                                               related_name='active_website')
+
+    plugin_uid = models.CharField(max_length=40, default=generate_plugin_uid)
+
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['username']  # only for createsuperuser
+
+    latest_ip_info = models.JSONField(default=dict)
+
+    @staticmethod
+    def get_domain(site_url: str | None) -> str | None:
+        """
+        Returns domain from the url
+        :param site_url: Connected site url
+        """
+        try:
+            extract = tldextract.extract(site_url)
+
+            if extract.subdomain:
+                return f"{extract.subdomain}.{extract.domain}.{extract.suffix}"
+            else:
+                return extract.registered_domain
+
+        except AttributeError:
+            return None
+
+    @property
+    def all_integrations(self) -> List:
+        """
+        Returns a list of connected integrations for article posting
+        """
+        integrations = []
+        all_integrations_models = [WordpressIntegration, WebflowIntegration,
+                                   WixIntegration, ShopifyIntegration, GhostIntegration, GHLIntegration]
+
+        for integration in all_integrations_models:
+            value: Any = integration.objects.filter(website=self.current_active_website)
+
+            for obj in value.all():
+                integration_name = obj.__class__.__name__.lower().replace("integration", "")
+
+                if isinstance(obj, ShopifyIntegration):
+                    integrations.append(f"{integration_name} - {obj.shop_url}")
+                elif isinstance(obj, GHLIntegration):
+                    integrations.append(f"{integration_name} - {self.get_domain(obj.ghl_domain)}")
+                elif hasattr(obj, "site_url"):
+                    if obj.site_url:
+                        integrations.append(f"{integration_name} - {self.get_domain(obj.site_url)}")
+                    else:
+                        integrations.append(f"{integration_name} - {obj.site_id}")
+                else:
+                    integrations.append(f"{integration_name} - {obj.site_id}")
+
+        return integrations
+
+    @property
+    def all_integrations_with_unique_id(self) -> List[Dict]:
+        """
+        Returns a list of connected integrations with a unique integration ID
+        """
+        all_integrations_models = [WordpressIntegration, WebflowIntegration,
+                                   WixIntegration, ShopifyIntegration, GhostIntegration, GHLIntegration]
+
+        integrations = []
+        unique_id_mapping = {
+            "WordpressIntegration": "site_url",
+            "WebflowIntegration": "collection_id",
+            "WixIntegration": "site_id",
+            "ShopifyIntegration": "shop_url",
+            "GhostIntegration": "site_url",
+            "GHLIntegration": "ghl_domain",
+        }
+
+        for integration in all_integrations_models:
+            value: Any = integration.objects.filter(website=self.current_active_website)
+
+            for obj in value.all():
+                class_name = obj.__class__.__name__.lower().replace("integration", "")
+
+                if hasattr(obj, "site_url"):
+                    if obj.site_url:
+                        integration_name = f"{class_name} - {self.get_domain(obj.site_url)}"
+                    else:                        
+                        integration_name = f"{class_name} - {obj.site_id}"
+                elif hasattr(obj, "ghl_domain"):
+                    integration_name = f"{class_name} - {self.get_domain(obj.ghl_domain)}"
+                elif hasattr(obj, "shop_url"):
+                    integration_name = f"{class_name} - {obj.shop_url}"
+
+                integrations.append({
+                    "integrationName": integration_name,
+                    "integrationUniqueID": getattr(obj, unique_id_mapping[obj.__class__.__name__])
+                })
+
+        return integrations
+
+    @property
+    def keywords(self) -> models.QuerySet:
+        """
+        Returns current active website keywords
+        """
+        return Keyword.objects.filter(website=self.current_active_website)
+
+    @property
+    def keyword_projects(self) -> models.QuerySet:
+        """
+        Returns current active website keyword projects
+        """
+        return KeywordProject.objects.filter(website=self.current_active_website)
+
+    @property
+    def automation_projects(self) -> models.QuerySet:
+        """
+        Returns current active website automation projects
+        """
+        return AutomationProject.objects.filter(website=self.current_active_website)
+
+    @property
+    def articles(self) -> models.QuerySet:
+        """
+        Returns current active website articles
+        """
+        return Article.objects.all_queryset().filter(website=self.current_active_website)
+
+    @property
+    def programmatic_seo_titles(self) -> models.QuerySet:
+        """
+        Returns current active website programmatic seo titles
+        """
+        return ProgrammaticSeoTitle.objects.filter(website=self.current_active_website)
+
+    @property
+    def glossary_topics(self) -> models.QuerySet:
+        """
+        Returns current active website glossary words
+        """
+        return GlossaryTopic.objects.filter(website=self.current_active_website)
+
+    @property
+    def glossary_content(self) -> models.QuerySet:
+        """
+        Returns current active website articles
+        """
+        return GlossaryContent.objects.filter(website=self.current_active_website)
+
+    @property
+    def wordpress_integrations(self) -> models.QuerySet:
+        """
+        Returns current active website wordpres sites
+        """
+        return WordpressIntegration.objects.filter(website=self.current_active_website)
+
+    @property
+    def wix_integrations(self) -> models.QuerySet:
+        """
+        Returns current active website wordpress sites
+        """
+        return WixIntegration.objects.filter(website=self.current_active_website)
+
+    @property
+    def webflow_integrations(self) -> models.QuerySet:
+        """
+        Returns current active website webflow sites
+        """
+        return WebflowIntegration.objects.filter(website=self.current_active_website)
+
+    @property
+    def shopify_integrations(self) -> models.QuerySet:
+        """
+        Returns current active website shopify sites
+        """
+        return ShopifyIntegration.objects.filter(website=self.current_active_website)
+
+    @property
+    def ghost_integrations(self) -> models.QuerySet:
+        """
+        Returns current active website ghost sites
+        """
+        return GhostIntegration.objects.filter(website=self.current_active_website)
+
+    @property
+    def ghl_integrations(self) -> models.QuerySet:
+        """
+        Returns current active website GHL sites
+        """
+        return GHLIntegration.objects.filter(website=self.current_active_website)
+
+    @property
+    def keyword_strategy(self):
+        """
+        Returns current active website keyword strategy
+        """
+        if not self.current_active_website:
+            return "cpc"
+        return self.current_active_website.keyword_strategy
+
+    @keyword_strategy.setter
+    def keyword_strategy(self, value: str):
+        """
+        Saves current active website keyword strategy
+        """
+        self.current_active_website.keyword_strategy = value
+        self.current_active_website.save()
+
+    @property
+    def image_source(self):
+        """
+        Returns current active website image source
+        """
+        if not self.current_active_website:
+            return "no_image"
+        return self.current_active_website.image_source
+
+    @image_source.setter
+    def image_source(self, value: str):
+        """
+        Saves current active website image source
+        """
+        self.current_active_website.image_source = value
+        self.current_active_website.save()
+
+    @property
+    def feature_image_template_id(self):
+        """
+        Returns current active website feature image template ID
+        """
+        if not self.current_active_website:
+            return ""
+        return self.current_active_website.feature_image_template_id
+
+    @feature_image_template_id.setter
+    def feature_image_template_id(self, value: str):
+        """
+        Saves current active website feature image template ID
+        """
+        if self.current_active_website:
+            self.current_active_website.feature_image_template_id = value
+            self.current_active_website.save()
+
+    @property
+    def feature_image_required(self):
+        """
+        Returns current active website feature image template required
+        """
+        if not self.current_active_website:
+            return True
+        return self.current_active_website.feature_image_required
+
+    @feature_image_required.setter
+    def feature_image_required(self, value: bool):
+        """
+        Saves current active website feature image template required
+        """
+        self.current_active_website.feature_image_required = value
+        self.current_active_website.save()
+
+    @property
+    def generate_bannerbear_featured_image(self):
+        """
+        Returns current active website bannerbear featured image
+        """
+        if not self.current_active_website:
+            return True
+        return self.current_active_website.generate_bannerbear_featured_image
+
+    @generate_bannerbear_featured_image.setter
+    def generate_bannerbear_featured_image(self, value: bool):
+        """
+        Saves current active website bannerbear featured image
+        """
+        self.current_active_website.generate_bannerbear_featured_image = value
+        self.current_active_website.save()
+
+    @property
+    def article_tone_of_voice(self):
+        """
+        Returns current active website article tone of voice
+        """
+        if not self.current_active_website:
+            return "exciting"
+        return self.current_active_website.article_tone_of_voice
+
+    @article_tone_of_voice.setter
+    def article_tone_of_voice(self, value: str):
+        """
+        Saves current active website article tone of voice
+        """
+        self.current_active_website.article_tone_of_voice = value
+        self.current_active_website.save()
+
+    @property
+    def external_backlinks_preference(self):
+        """
+        Returns current active website backlinks preference
+        """
+        if not self.current_active_website:
+            return "no-follow"
+        return self.current_active_website.external_backlinks_preference
+
+    @external_backlinks_preference.setter
+    def external_backlinks_preference(self, value: str):
+        """
+        Saves current active website backlinks preference
+        """
+        self.current_active_website.external_backlinks_preference = value
+        self.current_active_website.save()
+
+    @property
+    def max_internal_backlinks(self):
+        """
+        Returns current active website max internal backlinks
+        """
+        if not self.current_active_website:
+            return 5
+        return self.current_active_website.max_internal_backlinks
+
+    @max_internal_backlinks.setter
+    def max_internal_backlinks(self, value: int):
+        """
+        Saves current active website max internal backlinks
+        """
+        self.current_active_website.max_internal_backlinks = value
+        self.current_active_website.save()
+
+    @property
+    def max_external_backlinks(self):
+        """
+        Returns current active website extenal backlinks
+        """
+        if not self.current_active_website:
+            return 2
+        return self.current_active_website.max_external_backlinks
+
+    @max_external_backlinks.setter
+    def max_external_backlinks(self, value: int):
+        """
+        Saves current active website extenal backlinks
+        """
+        self.current_active_website.max_external_backlinks = value
+        self.current_active_website.save()
+
+    @property
+    def max_internal_glossary_backlinks(self):
+        """
+        Returns current active website internal glossary backlinks
+        """
+        if not self.current_active_website:
+            return 5
+        return self.current_active_website.max_internal_glossary_backlinks
+
+    @max_internal_glossary_backlinks.setter
+    def max_internal_glossary_backlinks(self, value: int):
+        """
+        Saves current active website internal glossary  backlinks
+        """
+        self.current_active_website.max_internal_glossary_backlinks = value
+        self.current_active_website.save()
+
+    @property
+    def internal_glossary_backlinks_preference(self):
+        """
+        Returns current active website internal glossary backlinks preference
+        """
+        if not self.current_active_website:
+            return "off"
+        return self.current_active_website.max_internal_glossary_backlinks
+
+    @internal_glossary_backlinks_preference.setter
+    def internal_glossary_backlinks_preference(self, value: int):
+        """
+        Saves current active website internal glossary backlinks preference
+        """
+        self.current_active_website.internal_glossary_backlinks_preference = value
+        self.current_active_website.save()
+
+    @property
+    def ai_generated_image_style(self):
+        """
+        Returns current active website image style
+        """
+        if not self.current_active_website:
+            return "illustration"
+        return self.current_active_website.ai_generated_image_style
+
+    @ai_generated_image_style.setter
+    def ai_generated_image_style(self, value: str):
+        """
+        Saves current active website image style
+        """
+        self.current_active_website.ai_generated_image_style = value
+        self.current_active_website.save()
+
+    @property
+    def images_file_format(self):
+        """
+        Returns current active website file format
+        """
+        if not self.current_active_website:
+            return "png"
+        return self.current_active_website.images_file_format
+
+    @images_file_format.setter
+    def images_file_format(self, value: str):
+        """
+        Saves current active website file format
+        """
+        self.current_active_website.images_file_format = value
+        self.current_active_website.save()
+
+    @property
+    def article_language_preference(self):
+        """
+        Returns current active website article language preference
+        """
+        if not self.current_active_website:
+            return "english"
+        return self.current_active_website.article_language_preference
+
+    @article_language_preference.setter
+    def article_language_preference(self, value: str):
+        """
+        Saves current active website article language preference
+        """
+        self.current_active_website.article_language_preference = value
+        self.current_active_website.save()
+
+    @property
+    def show_logo_on_featured_image(self):
+        """
+        Returns current active website show logo on featured_image
+        """
+        if not self.current_active_website:
+            return False
+        return self.current_active_website.show_logo_on_featured_image
+
+    @show_logo_on_featured_image.setter
+    def show_logo_on_featured_image(self, value: str):
+        """
+        Saves current active website show logo on featured_image
+        """
+        self.current_active_website.show_logo_on_featured_image = value
+        self.current_active_website.save()
+        
+    @property
+    def article_context(self):
+        """
+        Returns current active website article context
+        """
+        if not self.current_active_website:
+            return ""
+        return self.current_active_website.article_context
+
+    @article_context.setter
+    def article_context(self, value: str):
+        """
+        Saves current active website article language preference
+        """
+        self.current_active_website.article_context = value
+        self.current_active_website.save()
+
+    @property
+    def tone_of_article(self):
+        """
+        Returns current active website article context
+        """
+        if not self.current_active_website:
+            return ""
+        print(f"model s {self.current_active_website.tone_of_article}")
+        return self.current_active_website.tone_of_article
+
+    @tone_of_article.setter
+    def tone_of_article(self, value: str):
+        """
+        Saves current active website article language preference
+        """
+        self.current_active_website.tone_of_article = value
+        self.current_active_website.save()
+
+    @property
+    def scale_of_tone(self):
+        """
+        Returns current active website article context
+        """
+        if not self.current_active_website:
+            return ""
+        print(f"model s {self.current_active_website.scale_of_tone}")
+        return self.current_active_website.scale_of_tone
+
+    @scale_of_tone.setter
+    def scale_of_tone(self, value: str):
+        """
+        Saves current active website article language preference
+        """
+        self.current_active_website.scale_of_tone = value
+        self.current_active_website.save()
+
+    @property
+    def feature_image_template_label(self):
+        if not self.current_active_website:
+            return ""
+        return self.current_active_website.feature_image_template_label
+
+    @property
+    def has_ltd_plans(self):
+        return self.active_ltd_plans.exists()
+
+    @property
+    def active_ltd_plans(self):
+        return self.appsumo_licenses.filter(license_status="active")
+
+    def __str__(self):
+        return self.email
+
+    @property
+    def blog_finder(self) -> models.QuerySet:
+        """
+        Returns current active website blog finder
+        """
+        return BlogFinder.objects.filter(website=self.current_active_website)
+
+    @property
+    def blog_finder_project(self) -> models.QuerySet:
+        """
+        Returns current active website blog finder
+        """
+        return BlogFinderProject.objects.filter(website=self.current_active_website)
+
+    @property
+    def ai_calculators(self) -> models.QuerySet:
+        """
+        Returns current active website AI calculators
+        """
+        return AICalculator.objects.filter(website=self.current_active_website)
+
+explain user:
+***********************************************************************
+
+# Django Custom User Model - Complete Analysis
+
+## Model Overview
+
+This is a feature-rich custom User model for what appears to be a content management/SEO platform called "Abun". It extends Django's `AbstractBaseUser` to provide comprehensive user management with multi-website support.
+
+## Key Components
+
+### 1. Model Configuration
+```python
+class User(AbstractBaseUser):
+    objects = CustomUserManager()
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['username']
+```
+- Uses email as the primary authentication field instead of username
+- Links to the custom manager we saw earlier
+- Required fields for Django's createsuperuser command
+
+### 2. Core User Fields
+
+#### Basic Information
+- `email`: Unique email address (primary identifier)
+- `username`: Display name (not unique)
+- `verified`: Account verification status
+- `admin`: Admin privileges flag
+- `date_joined`, `updated_at`, `last_login`: Timestamps
+
+#### Authentication & Security
+- `signup_using_google`, `last_login_using_google`: Google OAuth tracking
+- `password_setup_required`: For social login users who need to set passwords
+- `reset_password_uid`, `reset_password_expiry`: Password reset tokens
+
+### 3. Payment Integration (Stripe)
+```python
+stripe_customer_id = models.CharField(...)
+stripe_subscription_id = models.CharField(...)
+stripe_product_id = models.CharField(...)
+stripe_pricing_id = models.CharField(...)
+payment_pending = models.BooleanField(...)
+stripe_active_checkout_session_id = models.CharField(...)
+```
+Complete Stripe payment system integration for subscription management.
+
+### 4. Usage Statistics & Limits
+```python
+# Current period stats
+keywords_generated = models.IntegerField(default=0)
+titles_generated = models.IntegerField(default=0)
+articles_generated = models.IntegerField(default=0)
+
+# All-time stats
+total_keywords_generated = models.IntegerField(default=0)
+total_articles_generated = models.IntegerField(default=0)
+total_titles_generated = models.IntegerField(default=0)
+```
+Tracks user activity for billing/limiting purposes.
+
+### 5. Multi-Website Architecture
+```python
+current_active_website = models.ForeignKey('Website',
+                                           null=True,
+                                           on_delete=models.DO_NOTHING,
+                                           related_name='active_website')
+```
+**Key Feature**: Users can manage multiple websites but work on one "active" website at a time.
+
+### 6. AppSumo Integration
+```python
+appsumo_licenses = models.ManyToManyField("AppSumoLicense")
+```
+Support for AppSumo lifetime deals and licensing.
+
+## Property Methods (Dynamic Attributes)
+
+### Integration Management
+```python
+@property
+def all_integrations(self) -> List:
+    """Returns list of connected integrations for article posting"""
+```
+Dynamically fetches all connected platforms:
+- WordPress, Webflow, Wix, Shopify, Ghost, GoHighLevel
+- Returns formatted list with platform names and domains
+
+### Website-Specific Data Access
+All these properties filter data by the current active website:
+
+```python
+@property
+def keywords(self) -> models.QuerySet:
+    return Keyword.objects.filter(website=self.current_active_website)
+
+@property
+def articles(self) -> models.QuerySet:
+    return Article.objects.all_queryset().filter(website=self.current_active_website)
+```
+
+**Available Properties:**
+- `keywords`: SEO keywords for current website
+- `keyword_projects`: Organized keyword groups
+- `automation_projects`: Automated content generation projects
+- `articles`: Generated articles
+- `programmatic_seo_titles`: Bulk SEO title generation
+- `glossary_topics`, `glossary_content`: Glossary management
+- Integration properties for each platform (WordPress, Wix, etc.)
+
+### Settings Management (Property Setters)
+The model uses property setters to manage website-specific settings:
+
+```python
+@property
+def keyword_strategy(self):
+    if not self.current_active_website:
+        return "cpc"
+    return self.current_active_website.keyword_strategy
+
+@keyword_strategy.setter
+def keyword_strategy(self, value: str):
+    self.current_active_website.keyword_strategy = value
+    self.current_active_website.save()
+```
+
+**Available Settings (with getters/setters):**
+- `keyword_strategy`: How to prioritize keywords ("volume", "cpc", "competition")
+- `image_source`: Where to get article images
+- `feature_image_template_id`: Template for featured images
+- `article_tone_of_voice`: Writing style ("exciting", etc.)
+- `external_backlinks_preference`: How to handle external links
+- `max_internal_backlinks`, `max_external_backlinks`: Link limits
+- `article_language_preference`: Content language
+- `ai_generated_image_style`: Style for AI images
+- `images_file_format`: Image format preference
+
+## Utility Methods
+
+### Domain Extraction
+```python
+@staticmethod
+def get_domain(site_url: str | None) -> str | None:
+    """Returns domain from the url"""
+```
+Uses `tldextract` to properly parse domains from URLs, handling subdomains correctly.
+
+### License Management
+```python
+@property
+def has_ltd_plans(self):
+    return self.active_ltd_plans.exists()
+
+@property
+def active_ltd_plans(self):
+    return self.appsumo_licenses.filter(license_status="active")
+```
+
+## Design Patterns Used
+
+### 1. **Multi-Tenancy Pattern**
+- Users can have multiple websites
+- All data is filtered by `current_active_website`
+- Settings are per-website, not per-user
+
+### 2. **Property-Based Settings Management**
+- Website settings accessed as user properties
+- Automatic saving when settings change
+- Default values when no website is active
+
+### 3. **Integration Abstraction**
+- Unified interface for multiple publishing platforms
+- Dynamic integration discovery
+- Consistent naming and identification
+
+### 4. **Usage Tracking Pattern**
+- Both current period and lifetime statistics
+- Separate counters for different content types
+- Useful for billing and feature limiting
+
+## Key Benefits
+
+1. **Simplified API**: Developers can access `user.articles` instead of complex filtering
+2. **Multi-tenant Ready**: One user account can manage multiple websites
+3. **Extensible**: Easy to add new integrations or content types
+4. **Settings Management**: Centralized but website-specific configuration
+5. **Usage Analytics**: Built-in tracking for business intelligence
+
+## Potential Issues
+
+1. **N+1 Queries**: Properties might cause database performance issues
+2. **Tight Coupling**: User model is heavily coupled to Website model
+3. **Large Model**: Single model handles many responsibilities
+4. **Memory Usage**: Many computed properties could impact performance
+
+## Usage Example
+
+```python
+# Access user's current website data
+user = User.objects.get(email="user@example.com")
+articles = user.articles  # Gets articles for current active website
+integrations = user.all_integrations  # Lists connected platforms
+
+# Change settings
+user.keyword_strategy = "volume"  # Automatically saves to current website
+user.article_tone_of_voice = "professional"
+
+# Switch active website
+user.current_active_website = other_website
+user.save()
+# Now all properties return data for the new active website
+```
+
+This model serves as the central hub for a comprehensive content management and SEO platform, providing a clean interface for complex multi-website, multi-integration functionality.
+
+
+some questions:
+@staticmethod ,
+@property and 
+  @property
+    def ai_generated_image_style(self):
+        """
+        Returns current active website image style
+        """
+        if not self.current_active_website:
+            return "illustration"
+        return self.current_active_website.ai_generated_image_style
+
+    @ai_generated_image_style.setter
+what does it mean  in django  model
+
+ans: In Django models, these are **Python decorators** that modify how methods and attributes behave. Let me explain each one:
+
+## @staticmethod
+A static method belongs to the class but doesn't need access to `self` (instance) or `cls` (class). It's just a regular function grouped with the class for organization.
+
+```python
+class MyModel(models.Model):
+    name = models.CharField(max_length=100)
+    
+    @staticmethod
+    def validate_email(email):
+        # This doesn't need self or cls
+        return "@" in email and "." in email
+```
+
+## @property
+Converts a method into a read-only attribute. You can access it like a regular attribute without calling it as a method.
+
+```python
+class MyModel(models.Model):
+    first_name = models.CharField(max_length=50)
+    last_name = models.CharField(max_length=50)
+    
+    @property
+    def full_name(self):
+        return f"{self.first_name} {self.last_name}"
+
+# Usage:
+user = MyModel.objects.get(id=1)
+print(user.full_name)  # No parentheses needed
+```
+
+## @property with .setter
+This creates a **computed property** that can be both read and written to. Your example shows this pattern:
+
+```python
+class MyModel(models.Model):
+    # ... other fields ...
+    
+    @property
+    def ai_generated_image_style(self):
+        """Getter - when you read the property"""
+        if not self.current_active_website:
+            return "illustration"
+        return self.current_active_website.ai_generated_image_style
+    
+    @ai_generated_image_style.setter
+    def ai_generated_image_style(self, value):
+        """Setter - when you assign to the property"""
+        if self.current_active_website:
+            self.current_active_website.ai_generated_image_style = value
+            self.current_active_website.save()
+```
+
+**Usage:**
+```python
+# Reading (calls the getter)
+style = my_model.ai_generated_image_style
+
+# Writing (calls the setter)
+my_model.ai_generated_image_style = "realistic"
+```
+
+This pattern is useful when you want to expose a simple attribute interface while hiding complex logic underneath, like accessing related model fields or performing calculations.
+
+
+*****************************************************************************************
+generating article uid
+def generate_article_uid(username: str="noUser", article_type="default") -> str:
+ """
+ Used to generate uid field value for Article model.
+ :param website_domain: connected website domain.
+ :param article_type: eg. 'default' or 'how_to'
+ """
+ unique_tail = str(uuid.uuid4())[:8]
+ username = username.replace(" ", "-").replace("%20", "-")
+if article_type == 'default':
+return f"article-{username}-{unique_tail}"
+elif article_type == 'how_to':
+return f"how-to-article-{username}-{unique_tail}"
+elif article_type == 'listicle':
+return f"listicle-{username}-{unique_tail}"
+else:
+raise Exception(f"Invalid article_type value provided ({article_type})")
+
+explaination ..uid :
+This function generates a **partial UUID**, not a complete one. Here's how it works:
+
+## UUID Generation Process
+
+```python
+unique_tail = str(uuid.uuid4())[:8]
+```
+
+1. **`uuid.uuid4()`** - Generates a random UUID4 (128-bit identifier)
+   - Example: `f47ac10b-58cc-4372-a567-0e02b2c3d479`
+
+2. **`str(...)`** - Converts the UUID object to string format
+   - Result: `"f47ac10b-58cc-4372-a567-0e02b2c3d479"`
+
+3. **`[:8]`** - Takes only the **first 8 characters**
+   - Result: `"f47ac10b"`
+
+## Complete Flow Example
+
+```python
+username = "john doe"
+article_type = "how_to"
+
+# Step 1: Generate 8-char UUID snippet
+unique_tail = str(uuid.uuid4())[:8]  # e.g., "a1b2c3d4"
+
+# Step 2: Clean username
+username = username.replace(" ", "-").replace("%20", "-")  # "john-doe"
+
+# Step 3: Build final UID
+return f"how-to-article-{username}-{unique_tail}"
+# Result: "how-to-article-john-doe-a1b2c3d4"
+```
+
+## Important Notes
+
+- **Not a full UUID**: Only uses 8 characters (32 bits) instead of the full 128-bit UUID
+- **Collision risk**: Higher chance of duplicates compared to full UUIDs
+- **Randomness**: Still provides good uniqueness for most use cases
+- **URL-friendly**: Creates clean, readable identifiers
+
+The function essentially creates a **human-readable unique identifier** that combines semantic meaning (article type, username) with random uniqueness, rather than generating a pure UUID.
+***********************************************************************************
+
+create keyword object:
+@transaction.atomic
+def create_keyword_object(user: User, keyword: str, with_default_values: bool = False, **kwargs) -> Keyword:
+    """
+    Used to create keyword object
+    :param user: User instance
+    :param keyword: keywrod to add
+    :param with_default_values: Set this to True for creating a keyword object with default values
+    """
+    md5_hash: str = hashlib.md5(f"{keyword}{kwargs.get('source')}{kwargs.get('country')}{uuid.uuid4().hex}".encode("utf-8")).hexdigest()
+
+    if with_default_values:
+        keyword_obj = Keyword(
+            website=user.current_active_website,
+            keyword_md5_hash=md5_hash,
+            keyword=unescape_amp_char(keyword),
+            source=kwargs["source"],
+            country=kwargs["country"],
+            serp_position=None,
+            volume=0,
+            cpc_currency="USD",
+            cpc_value=0.0,
+            paid_difficulty=0,
+            trend={'trends': []}
+        )
+    else:
+        keyword_obj = Keyword(
+            website=user.current_active_website,
+            keyword_md5_hash=md5_hash,
+            keyword=unescape_amp_char(keyword),
+            **kwargs
+        )
+
+    return keyword_obj
+
+explain create keyword :
+********************************************************************
+This Django function uses the @transaction.atomic decorator, which is a database transaction management tool. Here's what it means and how it works:
+@transaction.atomic
+This decorator ensures that all database operations within the function are executed as a single atomic transaction. This means:
+
+All or Nothing: Either ALL database operations succeed, or ALL are rolled back
+Data Consistency: Prevents partial updates that could leave your database in an inconsistent state
+Isolation: Other database connections won't see partial changes until the transaction completes
+
+How it works in your function:
+
+
+ 
+
+
+k9s -n vicky log during image generation
+********************************************************
+Context: minikube [RW]                            <0> tail   <6> 1h   <shift-c> Clear               <… ____  __ ________         Cluster: minikube                                 <1> head            <c>       Copy                <w|    |/  /   __   \______  User:    minikube                                 <2> 1m              <m>       Mark                  |       /\____    /  ___/  K9s Rev: v0.50.6                                  <3> 5m              <ctrl-s>  Save                  |    \   \  /    /\___  \  K8s Rev: v1.33.1                                  <4> 15m             <s>       Toggle AutoScroll     |____|\__ \/____//____  /  CPU:     n/a                                      <5> 30m             <f>       Toggle FullScreen              \/           \/   MEM:     n/a                                                                                                                    ┌────────── Logs(vicky/articlegeneration-vicky-a4271d19674d59bb-z5jn8:articlegeneration-vicky-a4271d19674d59bb)[tail] ──────────┐│                               Autoscroll:On      FullScreen:Off     Timestamps:Off     Wrap:Off                               
+││ crewai [INFO] - Cost of running Crew AI: Input Cost: $0.000662, Output Cost: $0.0017168, Total Cost: $0.0023788000000000004   ││ article_generation_v3 [INFO] - > Updating Redis key articlegeneration-vicky-a4271d19674d59bb-stagedata...                     ││ article_generation_v3 [DEBUG] - [*] Running Outline, Image & Intro generation...                                              ││ article_generation_v3 [ERROR] - Could not fetch image from AI generated image due to bad response status 401                  ││ article_generation_v3 [ERROR] - Could not fetch image from AI generated image due to bad response status 401                  ││ article_generation_v3 [ERROR] - Could not fetch image from AI generated image due to bad response status 401                  ││ article_generation_v3 [ERROR] - Could not fetch image from AI generated image due to bad response status 401                  ││ article_generation_v3 [ERROR] - Could not fetch image from AI generated image due to bad response status 401                  ││ article_generation_v3 [ERROR] - Could not fetch image from AI generated image due to bad response status 401                  ││ article_generation_v3 [ERROR] - Could not fetch image from AI generated image due to bad response status 401                  ││ article_generation_v3 [ERROR] - Could not fetch image from AI generated image due to bad response status 401                  ││ article_generation_v3 [ERROR] - Could not fetch image from AI generated image due to bad response status 401                  ││ article_generation_v3 [ERROR] - Could not fetch image from AI generated image due to bad response status 401                  ││ article_generation_v3 [INFO] - > Updating Redis key articlegeneration-vicky-a4271d19674d59bb-stagedata...                     ││ article_generation_v3 [DEBUG] - [*] Running article body content generation...                                                ││ article_generation_v3 [DEBUG] - Generating body content for article-vicky-9c8f517d in exciting tone and American English (en- ││ article_generation_v3 [INFO] - > Updating Redis key articlegeneration-vicky-a4271d19674d59bb-stagedata...                     ││ article_generation_v3 [DEBUG] - [*] Running article body table section generation...                                          ││ article_generation_v3 [INFO] - > Updating Redis key articlegeneration-vicky-a4271d19674d59bb-stagedata... 
+
+
+Article lincking
+*******************************
+Logs(vicky/articleinternallink-vicky-d13f07a17e5c2e04-lkb5w:articleinternallink-vicky-d13f07a17e5c2e04)[tail] ────────┐│                               Autoscroll:On      FullScreen:Off     Timestamps:Off     Wrap:Off                               
+││ internal_linking [INFO] - > Connecting to ChromaDB server at abun-chromadb-service-dev.yash.svc.cluster.local:8000            ││ internal_linking [ERROR] - Error connecting to ChromaDB server: [Errno -2] Name or service not known                          ││ internal_linking [WARNING] - ChromaDB client-server connection not available, cannot process internal links                   ││ internal_linking [DEBUG] - Internal link generation took 3.3911397457122803 seconds to complete                               ││ internal_linking [INFO] - Sending back results to https://vicky-drf.abun.com/wh/k8/article-internal-link/...                  ││ Webhook call successful. Received status 200                                                                                  ││ internal_linking [INFO] - All Done!                                                                                           ││ stream closed EOF for vicky/articleinternallink-vicky-d13f07a17e5c2e04-lkb5w (articleinternallink-vicky-d13f07a17e5c2e04)     ││                                                                                                                           
+
+***************************************************************************************************
+article generation and bulk article generation
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def article_generation_v2_api(request: Request):
+    """
+    Starts article generation V2 for given article title.
+
+    :param request: Django Rest Framework's Request object
+    """
+    user: User = request.user
+
+    if request.method == 'POST':
+        try:
+            article_uid: str = request.data['article_uid']
+            context: str = request.data.get('context','')
+        except KeyError:
+            return JsonResponseBadRequest()
+
+         # Allow the user to generate the first article without verification
+        if user.articles_generated == 0:
+            # No need to check email verification for the first article
+            pass
+
+        else:
+            # Check if user email is verified
+            if not user.verified and not user.has_ltd_plans:
+                return JsonResponseBadRequest(additional_data={'err_id': "USER_NOT_VERIFIED"})
+
+        if context:
+            article = user.articles.get(article_uid=article_uid)
+            article.context = context
+            article.save()
+
+        # check user article generation limit for the month
+        current_plan_data: Dict = get_stripe_product_data(user)
+        article_limit: int = current_plan_data['metadata']['max_articles']
+
+        if user.articles_generated >= article_limit:
+            return JsonResponse(status=200, data={'status': "rejected", 'reason': "max_limit_reached"})
+
+        # ------------------- Create K8 Job -------------------
+        article_k8_task_response = create_article_generation_v2_task(user, article_uid)
+        if article_k8_task_response['status'] == "error":
+            return JsonResponseBadRequest(additional_data={'err_id': article_k8_task_response['err_id'], 'message': article_k8_task_response['message']})
+
+        if not DEBUG:
+            # Delegate provisioning task to celery
+            celery_check_flyio_provisioning.delay(article_k8_task_response['machine_id'],
+                                                  article_k8_task_response['job_id'],
+                                                  FLY_ARTICLE_GEN_APP_NAME,
+                                                  FLY_ARTICLE_GEN_DEPLOY_TOKEN)
+
+        articles: QuerySet[Article] = user.articles.select_related(
+            'keyword',
+            'schedulearticleposting'
+        ).only(
+            'article_uid',
+            'title',
+            'internal_link_count',
+            'external_link_count',
+            'image_count',
+            'word_count',
+            'is_processing',
+            'is_generated',
+            'is_posted',
+            'is_failed',
+            'is_archived',
+            'is_user_added',
+            'article_link',
+            'posted_to',
+            'created_on',
+            'generated_on',
+            'posted_on',
+            'feedback',
+            'keyword__keyword',
+            'keyword__keyword_md5_hash',
+            'keyword__volume',
+            'schedulearticleposting__schedule_on'
+        ).prefetch_related(
+            Prefetch('keyword__keywordproject_set',
+                    queryset=KeywordProject.objects.only('project_id'))
+        )
+
+        updated_title_data = ArticleTitleTableDataSerializer(articles, many=True).data
+
+        user.articles_generated += 1
+        user.total_articles_generated += 1
+        user.save()
+
+        return JsonResponse(status=200, data={
+            'status': "sent_for_processing",
+            'updated_title_data': updated_title_data,
+        })
+
+    else:
+        return JsonResponseBadRequest()
+*************************************************************************************************************
+expalain :
+This Django API endpoint handles article generation requests with comprehensive validation, limits checking, and asynchronous task creation. Here's a detailed breakdown:
+
+## Function Signature & Decorators
+
+```python
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+```
+
+- **@api_view(['POST'])**: Restricts endpoint to POST requests only
+- **@permission_classes([IsAuthenticated])**: Requires user authentication
+- **@transaction.atomic**: Wraps the entire function in a database transaction for data consistency
+
+## Input Validation & User Setup
+
+```python
+user: User = request.user
+article_uid: str = request.data['article_uid']
+context: str = request.data.get('context','')
+```
+
+- Extracts the authenticated user from the request
+- Gets required `article_uid` (will raise KeyError if missing)
+- Gets optional `context` parameter with empty string default
+- Returns `JsonResponseBadRequest()` if required fields are missing
+
+## User Verification Logic
+
+The function implements a tiered verification system:
+
+### First Article Exception
+```python
+if user.articles_generated == 0:
+    pass  # No verification needed for first article
+```
+
+### Subsequent Articles
+```python
+if not user.verified and not user.has_ltd_plans:
+    return JsonResponseBadRequest(additional_data={'err_id': "USER_NOT_VERIFIED"})
+```
+
+- Users must be email-verified OR have LTD (Lifetime Deal) plans
+- Prevents unverified users from generating multiple articles
+
+## Context Handling
+
+```python
+if context:
+    article = user.articles.get(article_uid=article_uid)
+    article.context = context
+    article.save()
+```
+
+- Updates the article's context if provided
+- Uses the existing article record associated with the user
+
+## Usage Limits Enforcement
+
+```python
+current_plan_data: Dict = get_stripe_product_data(user)
+article_limit: int = current_plan_data['metadata']['max_articles']
+if user.articles_generated >= article_limit:
+    return JsonResponse(status=200, data={'status': "rejected", 'reason': "max_limit_reached"})
+```
+
+- Retrieves user's Stripe subscription data
+- Extracts article limit from plan metadata
+- Rejects request if user has reached their monthly limit
+- Note: Returns 200 status even for rejection (design choice for frontend handling)
+
+## Kubernetes Job Creation
+
+```python
+article_k8_task_response = create_article_generation_v2_task(user, article_uid)
+if article_k8_task_response['status'] == "error":
+    return JsonResponseBadRequest(...)
+```
+
+- Creates a Kubernetes job for article generation
+- Handles errors from the K8s job creation process
+- Returns specific error IDs and messages for frontend handling
+
+## Asynchronous Provisioning (Production Only)
+
+```python
+if not DEBUG:
+    celery_check_flyio_provisioning.delay(
+        article_k8_task_response['machine_id'], 
+        article_k8_task_response['job_id'], 
+        FLY_ARTICLE_GEN_APP_NAME, 
+        FLY_ARTICLE_GEN_DEPLOY_TOKEN
+    )
+```
+
+- Uses Celery for asynchronous task management in production
+- Monitors Fly.io provisioning status
+- Skipped in development/debug mode
+
+## Database Query Optimization
+
+The function includes a highly optimized database query:
+
+```python
+articles: QuerySet[Article] = user.articles.select_related(
+    'keyword', 'schedulearticleposting'
+).only(
+    # Specific fields to reduce data transfer
+).prefetch_related(
+    Prefetch('keyword__keywordproject_set', queryset=KeywordProject.objects.only('project_id'))
+)
+```
+
+- **select_related()**: Reduces database queries by joining related tables
+- **only()**: Limits fields retrieved to minimize data transfer
+- **prefetch_related()**: Efficiently loads related keyword projects
+- **Prefetch()**: Customizes the prefetch query to only get needed fields
+
+## User Statistics Update
+
+```python
+user.articles_generated += 1
+user.total_articles_generated += 1
+user.save()
+```
+
+- Increments monthly article counter
+- Increments lifetime article counter
+- Both metrics are important for billing and analytics
+
+## Response Structure
+
+### Success Response
+```python
+return JsonResponse(status=200, data={
+    'status': "sent_for_processing",
+    'updated_title_data': updated_title_data,
+})
+```
+
+### Error Responses
+- **Missing fields**: `JsonResponseBadRequest()`
+- **Unverified user**: `JsonResponseBadRequest(additional_data={'err_id': "USER_NOT_VERIFIED"})`
+- **Limit reached**: `JsonResponse(status=200, data={'status': "rejected", 'reason': "max_limit_reached"})`
+- **K8s job error**: `JsonResponseBadRequest(additional_data={'err_id': ..., 'message': ...})`
+
+## Key Design Patterns
+
+1. **Graceful Degradation**: First article works without verification
+2. **Comprehensive Error Handling**: Specific error codes for different failure modes
+3. **Performance Optimization**: Efficient database queries with minimal data transfer
+4. **Asynchronous Processing**: Non-blocking article generation using K8s and Celery
+5. **Transaction Safety**: Atomic operations ensure data consistency
+6. **Flexible Authentication**: Supports both email verification and LTD plans
+
+This endpoint effectively manages the complex workflow of article generation while maintaining performance, security, and user experience considerations.
+
+****************************************************************************************************
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def bulk_article_generation_v2_api(request: Request):
+    """
+    Starts bulk articles generation for given articles title.
+
+    :param request: Django Rest Framework's Request object
+    """
+    user: User = request.user
+    try:
+        articles_uid: str = request.data['articles_uid']
+    except KeyError:
+        return JsonResponseBadRequest()
+
+    # Allow the user to generate the first article without verification
+    if user.articles_generated == 0 and len(articles_uid) == 1:
+        # No need to check email verification for the first article
+        pass
+
+    else:
+        # Check if user email is verified
+        if not user.verified and not user.has_ltd_plans:
+            return JsonResponseBadRequest(additional_data={'err_id': "USER_NOT_VERIFIED"})
+
+
+    bulk_art_gen_jobs_res = create_bulk_article_generation_jobs(articles_uid, user)
+
+    if bulk_art_gen_jobs_res.get('status') == 'rejected':
+        if bulk_art_gen_jobs_res.get('reason') == 'max_limit_reached':
+            return JsonResponse(
+                status=200, data={"status": "rejected", "reason": "max_limit_reached"}
+            )
+
+        elif bulk_art_gen_jobs_res.get('reason') == 'no_articles_found':
+            return JsonResponseBadRequest(
+                additional_data={"err_id": "NO_SUCH_ARTICLE_FOUND"}
+            )
+
+    elif bulk_art_gen_jobs_res.get('status') == 'success':
+        articles: QuerySet[Article] = user.articles.select_related(
+            'keyword',
+            'schedulearticleposting'
+        ).only(
+            'article_uid',
+            'title',
+            'internal_link_count',
+            'external_link_count',
+            'image_count',
+            'word_count',
+            'is_processing',
+            'is_generated',
+            'is_posted',
+            'is_failed',
+            'is_archived',
+            'is_user_added',
+            'article_link',
+            'posted_to',
+            'created_on',
+            'generated_on',
+            'posted_on',
+            'feedback',
+            'keyword__keyword',
+            'keyword__keyword_md5_hash',
+            'keyword__volume',
+            'schedulearticleposting__schedule_on'
+        ).prefetch_related(
+            Prefetch('keyword__keywordproject_set',
+                    queryset=KeywordProject.objects.only('project_id'))
+        )
+
+        updated_title_data = ArticleTitleTableDataSerializer(articles, many=True).data
+
+        return JsonResponse(status=200, data={
+            'status': "sent_for_processing",
+            'updated_title_data': updated_title_data,
+        })
+
+    else:
+        return JsonResponseBadRequest()
+        
+        
+explain article generation and bulk article generation
+**********************************************************************************************
+
+
+***********************************************************************************************
+def create_article_generation_v2_task(user: User, article_uid: str, regenerate: bool = False) -> Dict:
+    """
+    Creates a new article generation task for the given article.
+
+    :param article_uid: Article UID for which the article generation task is to be created.
+    :param user: Related User model object.
+    :param regenerate: If True, the article will be regenerated even if it has already been generated.
+    """
+    try:
+        # ------------------- fetch article -------------------
+        try:
+            article: Article = Article.objects.get(article_uid=article_uid)
+        except Article.DoesNotExist as e:
+            raise ValueError(f"Article not found - {e}")
+
+        # ------------------- Create K8 Job -------------------
+        art_gen_job_id = generate_k8_job_id('articlegeneration', username=user.username)
+        art_gen_data = {
+            'article_uid': article_uid,
+            'domain': user.current_active_website.domain if user.current_active_website else "no website connected",
+            'title': article.title,
+            'image_source': user.image_source,
+            'abun_webhook_url': reverse('wh-k8-article-generation'),
+            'article_tone_of_voice': user.article_tone_of_voice,
+            'external_backlinks_preference': user.external_backlinks_preference,
+            'article_language_preference': user.article_language_preference,
+            'tone_of_article': user.tone_of_article,
+            'scale_of_tone': user.scale_of_tone,
+            'max_internal_backlinks': user.max_internal_backlinks,
+            'max_external_backlinks': user.max_external_backlinks,
+            'ai_generated_image_style': user.ai_generated_image_style,
+            'other_top_ranking_urls': article.other_top_ranking_urls,
+            'article_context': article.context,
+            'use_deepinfra_for_ai_img_gen': user.feature_image_template_label == "premium" and False or True,
+        }
+
+        if article is not None and article.keyword is not None:
+            art_gen_data['keyword'] = article.keyword.keyword
+        else:
+            art_gen_data['keyword'] = None
+
+        with get_redis_connection(db=REDIS_TASK_DATA_DB) as redis_connection:
+            redis_connection.set(art_gen_job_id, json.dumps(art_gen_data))
+            redis_connection.expire(art_gen_job_id, REDIS_ART_GEN_EXPIRY)
+
+        art_gen_k8_job = KubernetesJob(
+            job_id=art_gen_job_id,
+            user=user,
+            status='running',
+            metadata=article_uid,
+        )
+        art_gen_k8_job.save()
+
+        if DEBUG:
+            machine_id = "NOT_REQUIRED"
+            job_created = create_k8_job(
+                art_gen_job_id,
+                'article_generation_v3',
+                art_gen_job_id,
+                user.id,
+                [art_gen_job_id]
+            )
+
+            if not job_created:
+                return {
+                    "status": "error",
+                    "err_id": "FAILED_TO_CREATE_ARTICLE_GENERATION_TASK",
+                    "message": "Job is not created due to high load on the cluster."
+                }
+
+        else:
+            # ------------------- Trigger Fly.io -------------------
+            cmd = f"python3 article_gen.py {art_gen_job_id}"
+            cmd = cmd.split()
+            worker_props = {
+                "config": {
+                    "image": FLY_ARTICLE_GEN_IMAGE_URL,
+                    "auto_destroy": True,
+                    "init": {
+                        "cmd": cmd
+                    },
+                    "restart": {
+                        "policy": "on-failure",
+                        "max_retries": K8_JOB_RETRIES
+                    },
+                    "guest": {
+                        "cpu_kind": "shared",
+                        "cpus": 1,
+                        "memory_mb": 1024
+                    }
+                },
+            }
+
+            res = requests.post(
+                f"{FLY_API_HOST}/apps/{FLY_ARTICLE_GEN_APP_NAME}/machines",
+                headers={
+                    'Authorization': f"Bearer {FLY_ARTICLE_GEN_DEPLOY_TOKEN}",
+                    'Content-Type': 'application/json'
+                },
+                json=worker_props
+            )
+
+            if res.status_code != 200:
+                logger.error(res.text)
+                raise Exception("Failed to send the article generation task to fly.io")
+
+            # Wait for the machine to enter the started state
+            machine_id: str = res.json()['id']
+            machine_name: str = res.json()['name']
+
+            logger.debug(f"Machine ID: {machine_id}")
+            logger.debug(f"Machine Name: {machine_name}")
+
+        # ------------------- Update article status -------------------
+        article.is_processing = True
+        article.save()
+
+        return {
+            "status": "success",
+            "job_id": art_gen_job_id,
+            "machine_id": machine_id
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to create article generation task for {article_uid} - {e}")
+        return {"status": "error", "err_id": "FAILED_TO_CREATE_ARTICLE_GENERATION_TASK", "message": str(e)}
+explanation create_article_generation_v2_task:
+**********************************************************************************************************
+
+This function creates and manages article generation tasks in a distributed system. Let me break it down in detail:
+
+## Purpose
+The function `create_article_generation_v2_task` orchestrates the creation of background jobs for generating articles, handling both local development (Kubernetes) and production (Fly.io) environments.
+
+## Parameters
+- `user`: User object containing preferences and settings
+- `article_uid`: Unique identifier for the article to be generated
+- `regenerate`: Boolean flag to force regeneration of existing articles
+
+## Detailed Flow
+
+### 1. Article Retrieval
+```python
+article: Article = Article.objects.get(article_uid=article_uid)
+```
+- Fetches the article from the database using the provided UID
+- Raises `ValueError` if article doesn't exist
+
+### 2. Job Configuration Setup
+The function creates a comprehensive data payload (`art_gen_data`) containing:
+
+**User Preferences:**
+- Domain information from user's active website
+- Image source preferences
+- Tone of voice settings
+- Language preferences
+- Backlink limits (internal/external)
+- AI image generation style
+
+**Article-Specific Data:**
+- Article title, context, and keyword
+- Top-ranking competitor URLs for reference
+- Webhook URL for completion notifications
+
+**Technical Settings:**
+- Image generation provider selection (DeepInfra vs alternatives based on user's premium status)
+
+### 3. Redis Caching
+```python
+with get_redis_connection(db=REDIS_TASK_DATA_DB) as redis_connection:
+    redis_connection.set(art_gen_job_id, json.dumps(art_gen_data))
+    redis_connection.expire(art_gen_job_id, REDIS_ART_GEN_EXPIRY)
+```
+- Stores job data in Redis with automatic expiration
+- Uses a dedicated Redis database for task data
+- Enables worker processes to retrieve configuration
+
+### 4. Database Job Tracking
+```python
+art_gen_k8_job = KubernetesJob(
+    job_id=art_gen_job_id,
+    user=user,
+    status='running',
+    metadata=article_uid,
+)
+```
+- Creates a database record to track job status
+- Links job to user and article for monitoring
+
+### 5. Environment-Specific Execution
+
+**Development (DEBUG=True):**
+- Uses Kubernetes job creation via `create_k8_job()`
+- Runs `article_generation_v3` job type
+- Handles job creation failures gracefully
+
+**Production (DEBUG=False):**
+- Deploys to Fly.io using their REST API
+- Configures machine specifications:
+  - 1 shared CPU
+  - 1GB RAM
+  - Auto-destroy after completion
+  - Retry policy for failures
+- Executes `python3 article_gen.py {job_id}` command
+- Waits for machine to start and captures machine ID
+
+### 6. Article Status Update
+```python
+article.is_processing = True
+article.save()
+```
+- Marks article as being processed to prevent duplicate jobs
+- Provides UI feedback about processing state
+
+## Key Features
+
+**Error Handling:**
+- Comprehensive exception catching with detailed logging
+- Graceful failure responses with error codes
+- Specific handling for article not found scenarios
+
+**Scalability:**
+- Redis-based job queuing for distributed processing
+- Cloud deployment via Fly.io for production workloads
+- Configurable resource allocation
+
+**Monitoring:**
+- Database job tracking with unique IDs
+- Machine ID capture for infrastructure monitoring
+- Webhook integration for completion notifications
+
+**Flexibility:**
+- Environment-aware execution (dev vs prod)
+- User preference integration
+- Regeneration capability
+
+## Return Values
+**Success:**
+```python
+{
+    "status": "success",
+    "job_id": art_gen_job_id,
+    "machine_id": machine_id
+}
+```
+
+**Error:**
+```python
+{
+    "status": "error", 
+    "err_id": "FAILED_TO_CREATE_ARTICLE_GENERATION_TASK", 
+    "message": str(e)
+}
+```
+
+This function essentially acts as a sophisticated job dispatcher that bridges web application requests with distributed background processing infrastructure, handling the complexity of cloud deployments, user preferences, and error scenarios.
+
+
+How does Article generation process work once it initiated from frontend?
+1. take key word
+2. generate titles based on key word
+3. once a title is selected and generate article is called
+4.
+
+Feature: AI SEO Rank Tracker Feature 
+*********************************************
+Core Workflow
+User adds their website → We study the website → Generate a GPT prompt:
+“What kind of questions would people ask ChatGPT to discover websites like this one?”
+→ Get a list of relevant discovery-style questions → Show these to the user → User can create, edit, or delete the questions (CRUD)
+→ We ask each question to multiple LLMs → Parse their responses into a structured JSON format like:
+{ brand_name: string, website: string, position: int, ... }
+→ Identify which brands appear in top positions for each LLM → Show the ranking results, including where the user’s website ranked.
+A cron job will automate this weekly. Frequency of the check will vary based on the user's plan.
+
+
+Questions:
+doubt: what kind of paremeter would we use to study the website?
+doubt: We ask each question to multiple LLMs. But currenty we are using only one
+       single OPENAI model or multiple model
+what is website analyzer?
+
+
+
+get_user_api_website_api: 
+                  method:post
+                  // it will take website url from user side.
+                  // create and uuid for request and save to the db with the user.
+                  // start a website crawl engine( based on crewai agent researcher and content creater )
+                  // the agent will return 15-20 questions in response
+                  // save the question to db and send the uuid in response.
+
+frontend-side:
+// the uuid will be used to fetch the all 15-20 questions
+ // the question will be shown to the user.
+ //the questions may be edited/deleted our new created.
+
+aiseo-rank_api:
+ // once the user click on search button 
+ // the questions go to backend and update the question table accordingly.
+ //if saved then a agent with multiple llm search these questions and get a list
+   of website names/brand.
+ // check the rank of the brand in the list and save its position with the uuid.
+ // return response {brand:.. , website: , rank: }
+ 
+ breaking the task into smaller peaces
+ 
+ 
+ *****************************************************************
+ 9 june update:
+import os
+import io
+import contextlib
+import traceback
+import logging.config
+
+from crewai import Agent, Task, Crew, Process
+from crewai_tools import SerperDevTool, ScrapeWebsiteTool
+from flask import Flask, request, jsonify
+from langchain_openai import ChatOpenAI
+
+logging_config = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "default": {
+            "format": "{name} [{levelname}] - {message}",
+            "style": "{",
+        }
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "default",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "WARNING",
+    },
+    "loggers": {
+        "crewai": {
+            "handlers": ["console"],
+            "level": os.environ.get("ABUN_K8_DEBUG_LEVEL", "DEBUG"),
+            "propagate": False,
+        },
+    },
+}
+
+logging.config.dictConfig(logging_config)
+logger = logging.getLogger('crewai')
+
+app = Flask(__name__)
+
+# Environment variables
+os.environ["OPENAI_API_KEY"] = os.environ["ABUN_K8_OPENAI_API_KEY"]
+os.environ["SERPER_API_KEY"] = os.environ["ABUN_K8_SERPER_API_KEY"]
+DEBUG = True  # not os.environ["ABUN_K8_NAMESPACE"] == "abun-prod"
+
+# Initializing the search tool
+serper_tool = SerperDevTool()
+scrape_website_tool = ScrapeWebsiteTool()
+
+# Defining agents with roles and goals
+researcher = Agent(
+    role="Researcher",
+    goal="Find data, facts, pointers, insights.",
+    backstory="""You work at a leading Research Agency.
+    Your expertise is in researching data.
+    You have a knack for dissecting complex data and presenting actionable insights.""",
+    verbose=DEBUG,
+    allow_delegation=False,
+    tools=[serper_tool, scrape_website_tool],
+    max_iter=50,
+    max_execution_time=600,
+    llm=ChatOpenAI(model_name="gpt-4o-mini", temperature=0.7),
+)
+
+editor = Agent(
+    role="Senior Content Editor",
+    goal="Enhance Research Reports",
+    backstory="""You are a renowned Content Editor with a reputation.
+    You enhance research reports by adding more things that have been missed out for each section in the research report.""",
+    verbose=DEBUG,
+    allow_delegation=True,
+    max_iter=50,
+    max_execution_time=600,
+    llm=ChatOpenAI(model_name="gpt-4o-mini", temperature=0.7),
+)
+
+
+@app.route("/trigger-crewai", methods=["POST"])
+def trigger_crewai():
+    try:
+        # Create string for CrewAI logs
+        stdout = io.StringIO()
+
+        with contextlib.redirect_stdout(stdout):
+            # Get the 'art_title' parameter from the POST request
+            data = request.json
+            art_title = data.get("art_title", None)
+            art_context = data.get("art_context", None)
+
+            if not art_title:
+                return jsonify({"error": "art_title is required"}), 400
+
+            # Creating tasks for agents using the provided article title
+            if art_context:
+                task1 = Task(
+                    description=f"""Conduct a full detailed research for "{art_title}" & strictly follow these instructions from the user: "{art_context}".""",
+                    expected_output="research report in pointers",
+                    agent=researcher,
+                    llm=ChatOpenAI(model_name="gpt-4o-mini", temperature=1),
+                )
+
+            else:
+                task1 = Task(
+                    description=f"""Conduct a full detailed research for "{art_title}" & strictly follow these instructions from the user: "{art_context}".""",
+                    expected_output="research report in pointers",
+                    agent=researcher,
+                    llm=ChatOpenAI(model_name="gpt-4o-mini", temperature=1),
+                )
+
+            # Instantiating crew with a sequential process
+            crew = Crew(
+                agents=[researcher, editor],
+                tasks=[task1],
+                verbose=DEBUG,
+                process=Process.sequential,
+                manager_llm=ChatOpenAI(model_name="gpt-4o-mini", temperature=0.7),
+            )
+
+            # Getting crew to work!
+            crew_output = crew.kickoff()
+
+        try:
+            # Calculate cost based on input and output tokens used
+            token_usage = crew_output.token_usage
+            input_cost = (token_usage.prompt_tokens / 1000) * 0.000150  # gpt-4o-mini input token pricing
+            output_cost = (token_usage.completion_tokens / 1000) * 0.000600  # gpt-4o-mini output token pricing
+            total_cost = input_cost + output_cost
+
+            logger.info(f"Cost of running Crew AI: Input Cost: ${input_cost}, Output Cost: ${output_cost}, Total Cost: ${total_cost}")
+
+        except Exception as err:
+            logger.error(f"Failed to calculate the Crewai cost. Error: {err}")
+            traceback.print_exc()
+
+        # Get the crewai verbose
+        crewai_output = stdout.getvalue()
+
+        # Return the output as a JSON response
+        return jsonify({
+            "status": "success",
+            "result": crew_output.raw,
+            "verbose": crewai_output
+        })
+
+    except Exception as err:
+        logger.error(err)
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
+
+
+******************************************************************************************************
+explain crewAI:
+
+Here's a detailed explanation of each part of your code, followed by what the `researcher` agent returns:
+
+---
+
+### **1. Imports**
+```python
+import os
+import io
+import contextlib
+import traceback
+import logging.config
+
+from crewai import Agent, Task, Crew, Process
+from crewai_tools import SerperDevTool, ScrapeWebsiteTool
+from flask import Flask, request, jsonify
+from langchain_openai import ChatOpenAI
+```
+- **`os`**: Used for environment variable access.
+- **`io`**: Helps capture output (e.g., for logging).
+- **`contextlib`**: Redirects stdout to capture logs.
+- **`traceback`**: For error debugging.
+- **`logging.config`**: Configures logging.
+- **CrewAI components**:
+  - `Agent`, `Task`, `Crew`, `Process`: Core CrewAI classes for defining agents, tasks, and workflows.
+- **Tools**:
+  - `SerperDevTool`: Google Search API tool.
+  - `ScrapeWebsiteTool`: Web scraping tool.
+- **Flask**: For creating a REST API.
+- **`ChatOpenAI`**: OpenAI's LLM interface.
+
+---
+
+### **2. Logging Configuration**
+```python
+logging_config = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {"default": {"format": "{name} [{levelname}] - {message}", "style": "{"}},
+    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "default"}},
+    "root": {"handlers": ["console"], "level": "WARNING"},
+    "loggers": {
+        "crewai": {
+            "handlers": ["console"],
+            "level": os.environ.get("ABUN_K8_DEBUG_LEVEL", "DEBUG"),
+            "propagate": False,
+        }
+    },
+}
+logging.config.dictConfig(logging_config)
+logger = logging.getLogger('crewai')
+```
+- Configures structured logging:
+  - Logs are formatted as `[crewai] [DEBUG] - message`.
+  - Default log level is `DEBUG` (can be overridden via `ABUN_K8_DEBUG_LEVEL`).
+  - Logs are output to the console.
+
+---
+
+### **3. Flask App Setup**
+```python
+app = Flask(__name__)
+```
+- Initializes a Flask web application.
+
+---
+
+### **4. Environment Variables**
+```python
+os.environ["OPENAI_API_KEY"] = os.environ["ABUN_K8_OPENAI_API_KEY"]
+os.environ["SERPER_API_KEY"] = os.environ["ABUN_K8_SERPER_API_KEY"]
+DEBUG = True  # not os.environ["ABUN_K8_NAMESPACE"] == "abun-prod"
+```
+- Sets API keys for OpenAI and SerperDev (Google Search).
+- `DEBUG` flag is hardcoded to `True` (would typically check `ABUN_K8_NAMESPACE` for production).
+
+---
+
+### **5. Tools Initialization**
+```python
+serper_tool = SerperDevTool()
+scrape_website_tool = ScrapeWebsiteTool()
+```
+- `SerperDevTool`: Performs Google searches.
+- `ScrapeWebsiteTool`: Extracts content from web pages.
+
+---
+
+### **6. Researcher Agent**
+```python
+researcher = Agent(
+    role="Researcher",
+    goal="Find data, facts, pointers, insights.",
+    backstory="""You work at a leading Research Agency...""",
+    verbose=DEBUG,
+    allow_delegation=False,
+    tools=[serper_tool, scrape_website_tool],
+    max_iter=50,
+    max_execution_time=600,
+    llm=ChatOpenAI(model_name="gpt-4o-mini", temperature=0.7),
+)
+```
+- **Role**: Researcher.
+- **Goal**: Find data/insights.
+- **Tools**: Uses `SerperDevTool` (search) and `ScrapeWebsiteTool` (scraping).
+- **LLM**: GPT-4o-mini (temperature = 0.7 for balanced creativity).
+- **Constraints**: 
+  - No delegation (`allow_delegation=False`).
+  - Max 50 iterations (`max_iter=50`).
+  - 10-minute timeout (`max_execution_time=600`).
+
+---
+
+### **7. Editor Agent**
+```python
+editor = Agent(
+    role="Senior Content Editor",
+    goal="Enhance Research Reports",
+    backstory="""You are a renowned Content Editor...""",
+    verbose=DEBUG,
+    allow_delegation=True,
+    max_iter=50,
+    max_execution_time=600,
+    llm=ChatOpenAI(model_name="gpt-4o-mini", temperature=0.7),
+)
+```
+- **Role**: Editor refining the researcher's output.
+- **Delegation allowed**: Can assign subtasks.
+- Same LLM and constraints as the researcher.
+
+---
+
+### **8. Flask Route (`/trigger-crewai`)**
+```python
+@app.route("/trigger-crewai", methods=["POST"])
+def trigger_crewai():
+    try:
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            data = request.json
+            art_title = data.get("art_title", None)
+            art_context = data.get("art_context", None)
+
+            if not art_title:
+                return jsonify({"error": "art_title is required"}), 400
+```
+- Accepts a `POST` request with JSON data (`art_title` and optional `art_context`).
+- Validates that `art_title` is provided.
+
+---
+
+### **9. Task Creation**
+```python
+if art_context:
+    task1 = Task(
+        description=f"""Conduct research for "{art_title}" with instructions: "{art_context}".""",
+        expected_output="research report in pointers",
+        agent=researcher,
+    )
+else:
+    task1 = Task(
+        description=f"""Conduct research for "{art_title}".""",
+        expected_output="research report in pointers",
+        agent=researcher,
+    )
+```
+- Creates a task for the `researcher` agent:
+  - **Description**: Research the given `art_title` (with optional `art_context` for additional instructions).
+  - **Output**: A bullet-pointed research report.
+
+---
+
+### **10. Crew Execution**
+```python
+crew = Crew(
+    agents=[researcher, editor],
+    tasks=[task1],
+    verbose=DEBUG,
+    process=Process.sequential,
+    manager_llm=ChatOpenAI(model_name="gpt-4o-mini", temperature=0.7),
+)
+crew_output = crew.kickoff()
+```
+- **Crew Setup**:
+  - Agents: `researcher` and `editor`.
+  - Tasks: Only `task1` (research).
+  - **Process**: Sequential (researcher runs first, then editor).
+- **Execution**: `crew.kickoff()` runs the workflow.
+
+---
+
+### **11. Cost Calculation**
+```python
+token_usage = crew_output.token_usage
+input_cost = (token_usage.prompt_tokens / 1000) * 0.000150
+output_cost = (token_usage.completion_tokens / 1000) * 0.000600
+total_cost = input_cost + output_cost
+logger.info(f"Cost: Input ${input_cost}, Output ${output_cost}, Total ${total_cost}")
+```
+- Estimates cost based on OpenAI's GPT-4o-mini pricing:
+  - Input: $0.00015 per 1K tokens.
+  - Output: $0.00060 per 1K tokens.
+
+---
+
+### **12. Response**
+```python
+return jsonify({
+    "status": "success",
+    "result": crew_output.raw,
+    "verbose": stdout.getvalue()
+})
+```
+- Returns:
+  - `result`: The research report (from `crew_output.raw`).
+  - `verbose`: CrewAI execution logs.
+
+---
+
+### **What the Researcher Agent Returns**
+The `researcher` agent produces a **bullet-pointed research report** based on:
+1. **Google Searches** (via `SerperDevTool`).
+2. **Web Scraping** (via `ScrapeWebsiteTool`).
+3. **LLM Processing**: GPT-4o-mini synthesizes the data into structured insights.
+
+#### Example Output (for `art_title="Quantum Computing"`):
+```markdown
+- Quantum computing leverages qubits for exponential speedup over classical computers.
+- Key players: IBM, Google, D-Wave.
+- Current challenges: Error correction, qubit stability.
+- Potential applications: Cryptography, drug discovery.
+```
+
+The `editor` agent then enhances this report (e.g., adding missed details or improving clarity).
+
+---
+
+### **Key Notes**
+- The researcher’s output is **raw data** (not polished prose).
+- The `editor` refines it into a final report.
+- Errors are logged, and costs are tracked for transparency.
+
+************************************************************************************
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def competitors_api_v2(request: Request):
+    """
+    Fetches list of competitors for website using crewai. Returns List of {"name", "url"}.
+
+    :param request: Django Rest Framework's Request object
+    """
+    user: User = request.user
+
+    try:
+        current_plan_name = get_stripe_product_data(user)['name']
+    except stripe.error.InvalidRequestError:
+        current_plan_name = 'Trial'
+
+    if current_plan_name == 'Trial':
+        return JsonResponseBadRequest(additional_data={"err_id": "TRIAL_PLAN"})
+
+    if request.method == "POST":
+        try:
+            domain: str = request.data['domain']
+            limit: str = request.data.get('limit', '200')
+            regenerate_competitor = bool(request.data.get('regenerateCompetitor', False))
+
+        except KeyError:
+            return JsonResponseBadRequest()
+
+        if not domain:
+            return JsonResponse({"error": "Domain parameter is required."}, status=400)
+
+        competitor = CompetitorFinder(user, domain, limit, regenerate_competitor)
+
+        if DEBUG:
+            competitor.create_competitor_finder_task_on_k8s()
+        else:
+            competitor.create_competitor_finder_task_on_flyio()
+
+        return JsonResponse(status=200, data={'success': True, 'message': "OK" , 'job_id': competitor.competitor_finder_job_id}, safe=False)
+
+    else:
+        return JsonResponseBadRequest()
+
+********************************************************************************************************
+explain compititor api v2 code:
+This is a Django REST Framework (DRF) view function named `competitors_api_v2` that handles a POST request to fetch a list of competitors for a given website using CrewAI. Here's a detailed breakdown:
+
+---
+
+### **1. Decorators**
+```python
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+```
+- **`@api_view(['POST'])`**:  
+  - Restricts the view to only accept `POST` requests.
+- **`@permission_classes([IsAuthenticated])`**:  
+  - Ensures the user is authenticated (logged in).
+
+---
+
+### **2. Function Definition & Docstring**
+```python
+def competitors_api_v2(request: Request):
+    """
+    Fetches list of competitors for website using crewai. Returns List of {"name", "url"}.
+    """
+```
+- **Purpose**: Fetch competitors for a given domain using CrewAI.
+- **Input**: DRF `Request` object.
+- **Output**: JSON response with competitors or errors.
+
+---
+
+### **3. User Plan Validation**
+```python
+user: User = request.user
+
+try:
+    current_plan_name = get_stripe_product_data(user)['name']
+except stripe.error.InvalidRequestError:
+    current_plan_name = 'Trial'
+
+if current_plan_name == 'Trial':
+    return JsonResponseBadRequest(additional_data={"err_id": "TRIAL_PLAN"})
+```
+- **Steps**:
+  1. Get the user's Stripe subscription plan name.
+  2. If the plan is `Trial`, return an error (`TRIAL_PLAN`) denying access.
+- **Why?**: Likely restricts competitor analysis to paid plans only.
+
+---
+
+### **4. POST Request Handling**
+```python
+if request.method == "POST":
+    try:
+        domain: str = request.data['domain']
+        limit: str = request.data.get('limit', '200')
+        regenerate_competitor = bool(request.data.get('regenerateCompetitor', False))
+    except KeyError:
+        return JsonResponseBadRequest()
+```
+- **Parameters**:
+  - `domain` (required): Target website to analyze (e.g., `"example.com"`).
+  - `limit` (optional, default=`200`): Max number of competitors to return.
+  - `regenerateCompetitor` (optional, default=`False`): Force re-fetch competitors if `True`.
+- **Error Handling**: Returns `400 Bad Request` if `domain` is missing.
+
+---
+
+### **5. Input Validation**
+```python
+if not domain:
+    return JsonResponse({"error": "Domain parameter is required."}, status=400)
+```
+- Ensures `domain` is not empty.
+
+---
+
+### **6. Competitor Analysis Initiation**
+```python
+competitor = CompetitorFinder(user, domain, limit, regenerate_competitor)
+
+if DEBUG:
+    competitor.create_competitor_finder_task_on_k8s()
+else:
+    competitor.create_competitor_finder_task_on_flyio()
+```
+- **`CompetitorFinder`**:  
+  - A class (not shown in the code) that presumably uses CrewAI to:
+    1. Search for competitors (e.g., via SerperDevTool or similar).
+    2. Return structured data like `[{"name": "Competitor X", "url": "https://x.com"}]`.
+- **Execution**:
+  - **Debug Mode**: Runs on Kubernetes (`create_competitor_finder_task_on_k8s`).
+  - **Production**: Runs on Fly.io (`create_competitor_finder_task_on_flyio`).
+
+---
+
+### **7. Response**
+```python
+return JsonResponse(
+    status=200,
+    data={
+        'success': True,
+        'message': "OK",
+        'job_id': competitor.competitor_finder_job_id
+    },
+    safe=False
+)
+```
+- Returns a `200 OK` with:
+  - `success`: Confirmation flag.
+  - `job_id`: Identifier for tracking the async competitor-finding job.
+
+---
+
+### **8. Non-POST Request Handling**
+```python
+else:
+    return JsonResponseBadRequest()
+```
+- Rejects non-POST requests with a `400 Bad Request`.
+
+---
+
+### **Key Workflow Summary**
+1. **Authentication**: User must be logged in.
+2. **Plan Check**: Rejects trial users.
+3. **Input Validation**: Requires `domain`.
+4. **Competitor Fetching**:
+   - Delegates to `CompetitorFinder` (likely CrewAI-powered).
+   - Runs async (Kubernetes/Fly.io) and returns a `job_id`.
+5. **Response**: Success/error JSON.
+
+---
+
+### **Assumptions**
+- **`CompetitorFinder`**: Uses CrewAI agents/tools (e.g., `SerperDevTool`) to:
+  - Search for similar websites.
+  - Filter/scrape results.
+  - Return `{"name", "url"}` pairs.
+- **Async Processing**: The actual competitor list is fetched later (via `job_id`).
+
+Would you like details on how to implement `CompetitorFinder` with CrewAI?
+
+
+
+*******************************************************************************************
+CompetitorFinder:
+import os
+import json
+import html
+import logging
+from typing import List
+
+import redis
+import requests
+import tldextract
+
+from django.urls import reverse
+
+from AbunDRFBackend.settings import (REDIS_HOST, REDIS_PORT, REDIS_TASK_DATA_DB, REDIS_ART_GEN_EXPIRY, FLY_API_HOST,
+                                     FLY_COMPETITOR_FINDER_DEPLOY_TOKEN, FLY_COMPETITOR_FINDER_APP_NAME, FLY_COMPETITOR_FINDER_GEN_IMAGE_URL)
+
+from mainapp.models import KubernetesJob, User, IgnoredCompetitor, Competitor
+from mainapp.utils import create_k8_job, generate_k8_job_id, get_redis_connection
+from mainapp.tasks import celery_check_flyio_provisioning, celery_save_logos
+
+# Set up logger
+logger = logging.getLogger(__name__)
+
+class CompetitorFinder:
+    def __init__(self,
+                 user: User,
+                 domain: str,
+                 limit: str,
+                 regenerate_competitor: bool = False,
+                 k8_job_id: str | None = None,
+                 ) -> None:
+        self.user = user
+        self.domain = domain
+        self.limit = limit
+        self.regenerate_competitor = regenerate_competitor        
+        self.competitor_finder_job_id : str | None = k8_job_id
+        if self.competitor_finder_job_id:
+            self.k8_job = KubernetesJob.objects.get(job_id=self.competitor_finder_job_id)
+        else:
+            self.k8_job = None
+
+    def store_competitors(self, domains: List):
+        """
+        Store the competitors
+        :param domains: List of domains
+        """
+        website = self.user.current_active_website
+        competitors_to_ignore: List[str] = list(IgnoredCompetitor.objects.all().values_list('domain', flat=True))
+
+        # clean each domain and ignore bad ones
+        cleaned_domains: List[str] = []
+        for domain in domains:
+            domain_data = tldextract.extract(html.escape(domain))
+            domain = domain_data.domain
+            suffix = domain_data.suffix
+
+            if suffix and domain and (domain not in competitors_to_ignore):
+                cleaned_domains.append(f"{domain}.{suffix}")
+
+        # # remove duplicates        
+        # Remove competitors that are already present.
+        cleaned_domains = list(
+            set(cleaned_domains) - set(list(website.competitor_set.all().values_list('domain', flat=True)))
+        )
+
+        # fetch and store logos for these domains
+        celery_save_logos.delay(cleaned_domains)
+
+        # Create and add the competitors
+        for domain in cleaned_domains:
+            comp = Competitor(
+                website=website,
+                domain=domain,
+                protocol="https",
+                logo_url=f"https://{os.environ['CLOUDFLARE_R2_DOMAIN']}/{os.environ['CLOUDFLARE_R2_ENV']}/logo/{domain}"
+            )
+            comp.save()
+
+        self.k8_job.status = "completed"
+        self.k8_job.save()
+        
+        if self.regenerate_competitor:
+            website.regenerate_competitors = self.regenerate_competitor
+            website.save()
+
+        # Delete the redis key
+        with get_redis_connection(db=REDIS_TASK_DATA_DB) as redis_connection:
+            redis_connection.delete(self.k8_job.job_id)
+
+        logger.error(f"job_di ---- {self.k8_job}")
+
+    def create_competitor_finder_task_on_k8s(self):
+        """
+        Creates competitor finder task on K8s
+        """
+        competitor_finder_job_id = generate_k8_job_id('competitorfinder', username=self.user.username)
+        self.competitor_finder_job_id = competitor_finder_job_id
+
+        competitor_finder_data = {
+            'domain': self.domain,
+            'limit': self.limit,
+            'regenerate_competitor': self.regenerate_competitor,
+            'abun_webhook_url': reverse('wh-k8-competitor-finder'),        
+        }
+
+        with get_redis_connection(db=REDIS_TASK_DATA_DB) as redis_connection:
+            redis_connection.set(self.competitor_finder_job_id, json.dumps(competitor_finder_data))
+            redis_connection.expire(self.competitor_finder_job_id, REDIS_ART_GEN_EXPIRY)
+
+        competitor_finder_gen_k8_job = KubernetesJob(
+            job_id=self.competitor_finder_job_id,
+            user=self.user,
+            status='running',
+            metadata=self.domain,
+        )
+        competitor_finder_gen_k8_job.save()
+        self.k8_job = competitor_finder_gen_k8_job
+        
+        create_k8_job(
+            competitor_finder_job_id,
+            'competitor_finder',
+            competitor_finder_job_id,
+            self.user.id,
+            [competitor_finder_job_id]
+        )
+
+    def create_competitor_finder_task_on_flyio(self):
+        """
+        Creates competitor finder task on Fly.io using Celery
+        """
+        competitor_finder_job_id = generate_k8_job_id('competitorfinder', username=self.user.username)
+        self.competitor_finder_job_id = competitor_finder_job_id
+
+        competitor_finder_data = {
+            'domain': self.domain,
+            'limit': self.limit,
+            'regenerate_competitor': self.regenerate_competitor,
+            'abun_webhook_url': reverse('wh-k8-competitor-finder'),        
+        }
+
+        competitor_finder_gen_k8_job = KubernetesJob(
+            job_id=self.competitor_finder_job_id,
+            user=self.user,
+            status='running',
+            metadata=self.domain,
+        )
+        competitor_finder_gen_k8_job.save()
+        self.k8_job = competitor_finder_gen_k8_job
+
+        with get_redis_connection(db=REDIS_TASK_DATA_DB) as redis_connection:
+            redis_connection.set(self.competitor_finder_job_id, json.dumps(competitor_finder_data))
+            redis_connection.expire(self.competitor_finder_job_id, REDIS_ART_GEN_EXPIRY)
+
+        cmd = f"python3 competitor_finder.py {self.competitor_finder_job_id}"
+        cmd = cmd.split()
+        worker_props = {
+            "config": {
+                "image": FLY_COMPETITOR_FINDER_GEN_IMAGE_URL,
+                "auto_destroy": True,
+                "init": {
+                    "cmd": cmd
+                },
+                "restart": {
+                    "policy": "no"
+                },
+                "guest": {
+                    "cpu_kind": "shared",
+                    "cpus": 1,
+                    "memory_mb": 1024
+                }
+            },
+        }
+
+        res = requests.post(
+            f"{FLY_API_HOST}/apps/{FLY_COMPETITOR_FINDER_APP_NAME}/machines",
+            headers={
+                'Authorization': f"Bearer {FLY_COMPETITOR_FINDER_DEPLOY_TOKEN}",
+                'Content-Type': 'application/json'
+            },
+            json=worker_props
+        )
+
+        if res.status_code != 200:
+            # Mark the k8 job as failed
+            self.k8_job.status = "failed"
+            self.k8_job.save()
+
+            logger.error(res.text)
+            raise Exception("Failed to send the competitor finder task to fly.io")
+
+        # Get the machine ID and name
+        machine_id: str = res.json()['id']
+        machine_name: str = res.json()['name']
+
+        # Store it for later use
+        self.machine_id = machine_id
+        self.machine_name = machine_name
+
+        logger.debug(f"Machine ID: {self.machine_id}")
+        logger.debug(f"Machine Name: {self.machine_name}")
+
+        # Use Celery task to check provisioning status
+        celery_check_flyio_provisioning.delay(machine_id,
+                                              self.competitor_finder_job_id,
+                                              FLY_COMPETITOR_FINDER_APP_NAME,
+                                              FLY_COMPETITOR_FINDER_DEPLOY_TOKEN)
+
+
+explain CompetitorFinder code
+**************************************************************************************************
+Here's a detailed breakdown of the `CompetitorFinder` class and its functionality:
+
+---
+
+### **1. Class Initialization (`__init__`)**
+```python
+def __init__(self, user: User, domain: str, limit: str, regenerate_competitor: bool = False, k8_job_id: str | None = None):
+```
+- **Purpose**: Initializes the competitor finder with user and target domain details.
+- **Parameters**:
+  - `user`: The authenticated user making the request.
+  - `domain`: Target website to analyze (e.g., `"example.com"`).
+  - `limit`: Max number of competitors to fetch (default: `200`).
+  - `regenerate_competitor`: If `True`, forces re-fetching even if competitors exist.
+  - `k8_job_id`: Optional Kubernetes job ID for tracking an existing job.
+
+---
+
+### **2. Core Methods**
+
+#### **`store_competitors(self, domains: List)`**
+- **Purpose**: Saves validated competitor domains to the database.
+- **Workflow**:
+  1. **Filters Ignored Domains**:  
+     Uses `IgnoredCompetitor` model to exclude blacklisted domains.
+     ```python
+     competitors_to_ignore = list(IgnoredCompetitor.objects.all().values_list('domain', flat=True))
+     ```
+  2. **Cleans Domains**:  
+     Uses `tldextract` to standardize domains (e.g., `"https://sub.example.com"` → `"example.com"`).
+     ```python
+     domain_data = tldextract.extract(html.escape(domain))
+     cleaned_domains.append(f"{domain_data.domain}.{domain_data.suffix}")
+     ```
+  3. **Removes Duplicates**:  
+     Skips domains already stored for the user's website.
+     ```python
+     set(cleaned_domains) - set(website.competitor_set.all().values_list('domain', flat=True))
+     ```
+  4. **Saves Competitors**:  
+     Creates `Competitor` objects with Cloudflare R2-hosted logos.
+     ```python
+     Competitor(website=website, domain=domain, protocol="https", logo_url=...)
+     ```
+  5. **Updates Job Status**:  
+     Marks the Kubernetes job as `completed` and cleans up Redis data.
+
+---
+
+#### **`create_competitor_finder_task_on_k8s(self)`**
+- **Purpose**: Launches a Kubernetes job to find competitors.
+- **Steps**:
+  1. **Generates Job ID**:  
+     Uses `generate_k8_job_id()` to create a unique ID (e.g., `"competitorfinder-user123"`).
+  2. **Stores Task Data in Redis**:  
+     Saves domain, limit, and webhook URL for the job.
+     ```python
+     redis_connection.set(job_id, json.dumps(competitor_finder_data))
+     ```
+  3. **Creates Kubernetes Job**:  
+     Triggers a job via `create_k8_job()` with the job ID and user ID.
+
+---
+
+#### **`create_competitor_finder_task_on_flyio(self)`**
+- **Purpose**: Runs competitor finding as a Fly.io machine (serverless container).
+- **Key Differences from K8s**:
+  - Uses Fly.io's Machines API instead of Kubernetes.
+  - Deploys a pre-built Docker image (`FLY_COMPETITOR_FINDER_GEN_IMAGE_URL`).
+  - Automatically destroys the machine after completion (`"auto_destroy": True`).
+  - Monitors provisioning status via Celery (`celery_check_flyio_provisioning`).
+
+---
+
+### **3. Supporting Components**
+
+#### **Redis Integration**
+- **Usage**: Temporarily stores job data (e.g., domain, limit) with expiry.
+  ```python
+  redis_connection.expire(job_id, REDIS_ART_GEN_EXPIRY)
+  ```
+
+#### **Fly.io Machine Configuration**
+- **Specs**: 1 vCPU, 1GB RAM, ephemeral.
+  ```json
+  "guest": { "cpu_kind": "shared", "cpus": 1, "memory_mb": 1024 }
+  ```
+
+#### **Error Handling**
+- Failed Fly.io deployments mark the job as `failed`:
+  ```python
+  self.k8_job.status = "failed"
+  ```
+
+---
+
+### **4. Workflow Summary**
+1. **User Request** → `competitors_api_v2` validates and triggers `CompetitorFinder`.
+2. **Job Creation** →  
+   - Debug: Runs on Kubernetes.  
+   - Production: Runs on Fly.io.
+3. **Competitor Fetching** →  
+   - External script (`competitor_finder.py`) presumably uses CrewAI/SerperDev to find competitors.
+4. **Result Processing** →  
+   - Validates domains → Saves to DB → Updates job status.
+
+---
+
+### **Key Features**
+- **Async Processing**: Jobs run in the background (K8s/Fly.io).
+- **Domain Validation**: Cleans and filters domains before saving.
+- **Scalability**: Fly.io machines allow serverless scaling.
+- **Idempotency**: `regenerate_competitor` flag controls re-fetching.
+
+---
+
+### **Example Flow**
+1. **Request**:
+   ```bash
+   POST /competitors_api_v2 { "domain": "example.com", "limit": 50 }
+   ```
+2. **Response**:
+   ```json
+   { "success": true, "job_id": "competitorfinder-user123" }
+   ```
+3. **Result**:
+   - Competitors stored in DB under `Competitor` model.
+   - Logos fetched and saved to Cloudflare R2.
+
+Would you like details on the presumed `competitor_finder.py` script or CrewAI integration?
+
+
+******************************************************************************************
+10 june 2025
+
+k8 has multiple docker files.
+Dockerfile.article_generation_v2 
+Dockerfile.article_generation_v3 
+Dockerfile.article_internal_linking
+Dockerfile.competitor_finder_v2
+Dockerfile.content_plan_generation
+Dockerfile.crewai 
+Dockerfile.website_scanning 
+
+one is secrets.dev.yml.example
+other are folder like crewai , article_generation ect. 
+Now I would like to get k8 tutorial base on this context
+
+answer:
+# How to Determine the Number of Containers Running in a Pod
+
+There are several ways to check how many containers are running inside a Kubernetes pod:
+
+## 1. Using `kubectl describe pod`
+
+```bash
+kubectl describe pod <pod-name> -n <namespace>
+```
+
+Look for the "Containers" section in the output. It will list all containers in the pod along with their status.
+
+Example output:
+```
+Containers:
+  main-container:
+    Container ID:   docker://abc123...
+    Ready:          True
+  sidecar-container:
+    Container ID:   docker://def456...
+    Ready:          True
+```
+
+## 2. Using `kubectl get pod` with wide output
+
+```bash
+kubectl get pod <pod-name> -n <namespace> -o wide
+```
+
+The output will show the number of containers and how many are ready:
+
+```
+NAME              READY   STATUS    RESTARTS   AGE   IP           NODE       NOMINATED NODE   READINESS GATES
+my-pod            2/2     Running   0          1h    10.244.1.2   node-1     <none>           <none>
+```
+
+Here `2/2` means 2 containers are running out of 2 total in the pod.
+
+## 3. Using JSON or YAML output format
+
+```bash
+kubectl get pod <pod-name> -n <namespace> -o json | jq '.spec.containers | length'
+```
+
+or 
+
+```bash
+kubectl get pod <pod-name> -n <namespace> -o yaml | yq '.spec.containers | length'
+```
+
+This will give you the exact number of containers defined in the pod spec.
+
+## 4. Checking init containers separately
+
+If you also want to see init containers (which run before main containers):
+
+```bash
+kubectl get pod <pod-name> -n <namespace> -o json | jq '.spec.initContainers | length'
+```
+
+## 5. Using custom columns
+
+```bash
+kubectl get pods -n <namespace> --no-headers -o custom-columns="NAME:.metadata.name,CONTAINERS:.spec.containers[*].name"
+```
+
+This will show all container names for each pod.
+
+## 6. Counting running containers only
+
+To count only the currently running containers (not just defined ones):
+
+```bash
+kubectl get pod <pod-name> -n <namespace> -o json | jq '.status.containerStatuses | length'
+```
+
+## Practical Example
+
+For a pod with 1 main container and 1 sidecar:
+
+```bash
+$ kubectl get pod my-pod -o json | jq '.spec.containers | length'
+2
+
+$ kubectl get pod my-pod -o json | jq '.status.containerStatuses | length'
+2
+```
+
+Remember that a pod can have:
+1. Init containers (run to completion before main containers start)
+2. Regular containers (your application containers)
+3. Ephemeral containers (for debugging)
+
+*****************************************************************************************************
+line crewai docket is running a flask app and It has an api with endpoint "/crewai/get-article/" , method post
+body like {"title":"  "}.  Now how can i interact with the api from outside the k8
+
+answer:
+# Interacting with the CrewAI Flask API from Outside Kubernetes
+
+To interact with your CrewAI Flask API running in Kubernetes from outside the cluster, you'll need to expose the service properly. Here are several methods:
+
+## Method 1: Using NodePort Service (for development/testing)
+
+1. **Modify your service definition** (or create one if it doesn't exist):
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: crewai-service
+  namespace: your-namespace
+spec:
+  type: NodePort
+  selector:
+    app: crewai
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 5000  # Assuming Flask runs on 5000
+      nodePort: 30007   # Range 30000-32767
+```
+
+2. Apply the changes:
+```bash
+kubectl apply -f crewai-service.yaml
+```
+
+3. Find your node's IP:
+```bash
+kubectl get nodes -o wide
+```
+
+4. Access the API:
+```bash
+curl -X POST http://<node-ip>:30007/crewai/get-article/ \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Your Article Title"}'
+```
+
+## Method 2: Using LoadBalancer (cloud providers)
+
+1. Change service type to LoadBalancer:
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: crewai-service
+spec:
+  type: LoadBalancer
+  # ... rest of config same as above
+```
+
+2. Get the external IP:
+```bash
+kubectl get svc crewai-service
+```
+
+3. Use the external IP in your requests.
+
+## Method 3: Using Ingress (production recommended)
+
+1. Create an Ingress resource:
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: crewai-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+spec:
+  rules:
+  - host: api.yourdomain.com
+    http:
+      paths:
+      - path: /crewai(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: crewai-service
+            port:
+              number: 80
+```
+
+2. Access via the defined host:
+```bash
+curl -X POST https://api.yourdomain.com/crewai/get-article/ \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Your Article Title"}'
+```
+
+## Method 4: Port Forwarding (temporary access)
+
+For quick testing without exposing services:
+```bash
+kubectl port-forward svc/crewai-service 8080:80 -n your-namespace
+```
+
+Then access:
+```bash
+curl -X POST http://localhost:8080/crewai/get-article/ \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Your Article Title"}'
+```
+
+## Security Considerations
+
+1. **Authentication**: Add API keys or JWT tokens
+2. **HTTPS**: Always use TLS in production
+3. **Rate Limiting**: Implement to prevent abuse
+4. **CORS**: Configure if accessing from browsers
+
+Example with authentication:
+```bash
+curl -X POST http://your-api-endpoint/crewai/get-article/ \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-api-key" \
+  -d '{"title":"Your Article Title"}'
+```
+
+Choose the method that best fits your environment (development, staging, or production). For production, Ingress with proper TLS termination is recommended.
+
+***************************************************************
+How can I get confidence in writting yaml file?
+
+answer:
+# Gaining Confidence in Writing Kubernetes YAML Files
+
+Writing Kubernetes YAML files can be intimidating at first, but with these strategies, you'll gain confidence quickly:
+
+## 1. Start with the Basics
+
+**Understand the structure** of every Kubernetes YAML file:
+```yaml
+apiVersion:  # Which Kubernetes API version to use (e.g., v1, apps/v1)
+kind:       # What resource you're creating (Pod, Deployment, Service, etc.)
+metadata:   # Identifying information (name, labels, annotations)
+spec:       # The desired state of your resource
+```
+
+## 2. Use Built-in Documentation
+
+**kubectl explain** is your best friend:
+```bash
+# See all available resources
+kubectl api-resources
+
+# Get documentation for a specific resource
+kubectl explain deployment
+kubectl explain deployment.spec
+kubectl explain deployment.spec.template.spec.containers
+```
+
+## 3. Leverage YAML Generators
+
+**Create starter YAML files**:
+```bash
+# Generate a basic YAML file
+kubectl create deployment my-app --image=nginx --dry-run=client -o yaml > deployment.yaml
+kubectl expose deployment my-app --port=80 --dry-run=client -o yaml > service.yaml
+```
+
+## 4. Validate Before Applying
+
+**Check for errors** before deploying:
+```bash
+# Validate syntax
+kubectl apply -f your-file.yaml --dry-run=client
+
+# Check for schema validation
+kubeval your-file.yaml  # Requires kubeval installation
+
+# Use linting tools
+yamllint your-file.yaml
+```
+
+## 5. Use IDE Support
+
+**Editor tools** that help:
+- VS Code with Kubernetes extension
+- IntelliJ IDEA Kubernetes plugin
+- YAML language server support
+
+## 6. Learn from Examples
+
+**Official Kubernetes examples**:
+```bash
+# View examples for any resource
+kubectl explain deployment --recursive | less
+```
+
+## 7. Practice Incrementally
+
+**Start simple and add complexity**:
+1. Create a basic Pod
+2. Add a container
+3. Add environment variables
+4. Add volumes
+5. Convert to Deployment
+6. Add readiness/liveness probes
+
+## 8. Use Templates and Snippets
+
+**Create reusable templates**:
+```yaml
+# deployment-template.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.name }}
+spec:
+  replicas: {{ .Values.replicas }}
+  template:
+    spec:
+      containers:
+      - name: {{ .Values.name }}
+        image: {{ .Values.image }}
+        ports:
+        - containerPort: {{ .Values.port }}
+```
+
+## 9. Understand Common Patterns
+
+**Learn these essential patterns**:
+- Pod with multiple containers
+- ConfigMaps and Secrets
+- Resource requests/limits
+- Probes (readiness/liveness/startup)
+- Affinity/anti-affinity rules
+
+## 10. Test in Safe Environments
+
+**Practice in**:
+- Minikube (local Kubernetes)
+- Kind (Kubernetes in Docker)
+- Separate namespaces in your real cluster
+
+## Bonus: Quick Reference Cheatsheet
+
+| Section       | Common Elements                          |
+|--------------|-----------------------------------------|
+| metadata     | name, namespace, labels, annotations   |
+| spec         | containers, volumes, restartPolicy     |
+| containers   | image, ports, env, volumeMounts        |
+| service      | type, ports, selector                  |
+
+**Remember**: Every Kubernetes YAML file you write makes you better. Start with simple configurations, validate often, and gradually incorporate more advanced features as you gain confidence.
